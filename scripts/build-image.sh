@@ -30,5 +30,11 @@ mv "$STAGE/mattermore-calls-$CALLS_VERSION.tar.gz" "$STAGE/mattermore-calls.tar.
 rm -f "$STAGE"/mattermore-calls-*.sha256
 cp "$ROOT/Containerfile" "$STAGE/Containerfile"
 
+# The image rewrites the config upstream ships, so both halves of that go into
+# the build context.
+mkdir -p "$STAGE/config" "$STAGE/scripts"
+cp "$ROOT/config/overrides.json" "$STAGE/config/overrides.json"
+cp "$ROOT/scripts/merge-config.py" "$STAGE/scripts/merge-config.py"
+
 "$engine" build -t "$TAG" -f "$STAGE/Containerfile" "$STAGE"
 echo "==> $TAG"

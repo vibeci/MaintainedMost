@@ -1,0 +1,103 @@
+diff --git a/server/public/model/config.go b/server/public/model/config.go
+index 9d27ea74..7f865ed8 100644
+--- a/server/public/model/config.go
++++ b/server/public/model/config.go
+@@ -171,11 +171,13 @@ const (
+ 
+ 	EmailSettingsDefaultFeedbackOrganization = ""
+ 
+-	SupportSettingsDefaultTermsOfServiceLink = "https://mattermost.com/pl/terms-of-use/"
+-	SupportSettingsDefaultPrivacyPolicyLink  = "https://mattermost.com/pl/privacy-policy/"
+-	SupportSettingsDefaultAboutLink          = "https://mattermost.com/pl/about-mattermost"
+-	SupportSettingsDefaultHelpLink           = "https://mattermost.com/pl/help/"
+-	SupportSettingsDefaultReportAProblemLink = "https://mattermost.com/pl/report-a-bug"
++	// Empty on purpose. The web app hides these links when they are unset, which
++	// is better than pointing at terms written for a different company.
++	SupportSettingsDefaultTermsOfServiceLink = ""
++	SupportSettingsDefaultPrivacyPolicyLink  = ""
++	SupportSettingsDefaultAboutLink          = "https://mattermore.dev"
++	SupportSettingsDefaultHelpLink           = "https://mattermore.dev/docs"
++	SupportSettingsDefaultReportAProblemLink = "https://github.com/dennisklappe/mattermore/issues"
+ 	SupportSettingsDefaultSupportEmail       = ""
+ 	SupportSettingsDefaultReAcceptancePeriod = 365
+ 
+@@ -218,9 +220,9 @@ const (
+ 	SamlSettingsCanonicalAlgorithmC14n11  = "Canonical1.1"
+ 	SamlSettingsDefaultCanonicalAlgorithm = SamlSettingsCanonicalAlgorithmC14n
+ 
+-	NativeappSettingsDefaultAppDownloadLink        = "https://mattermost.com/pl/download-apps"
+-	NativeappSettingsDefaultAndroidAppDownloadLink = "https://mattermost.com/pl/android-app/"
+-	NativeappSettingsDefaultIosAppDownloadLink     = "https://mattermost.com/pl/ios-app/"
++	NativeappSettingsDefaultAppDownloadLink        = "https://mattermore.dev/#app-grid"
++	NativeappSettingsDefaultAndroidAppDownloadLink = "https://play.google.com/store/apps/details?id=com.mattermost.rn"
++	NativeappSettingsDefaultIosAppDownloadLink     = "https://apps.apple.com/app/mattermost/id1257222717"
+ 
+ 	ExperimentalSettingsDefaultLinkMetadataTimeoutMilliseconds                       = 5000
+ 	ExperimentalSettingsDefaultUsersStatusAndProfileFetchingPollIntervalMilliseconds = 3000
+diff --git a/webapp/channels/src/components/about_build_modal/about_build_modal.tsx b/webapp/channels/src/components/about_build_modal/about_build_modal.tsx
+index 1560bfe1..b173cbb9 100644
+--- a/webapp/channels/src/components/about_build_modal/about_build_modal.tsx
++++ b/webapp/channels/src/components/about_build_modal/about_build_modal.tsx
+@@ -102,13 +102,13 @@ export default function AboutBuildModal(props: Props) {
+         <div>
+             <FormattedMessage
+                 id='about.teamEditionLearn'
+-                defaultMessage='Join the Mattermost community at '
++                defaultMessage='Learn more about Mattermore at '
+             />
+             <ExternalLink
+                 location='about_build_modal'
+-                href='https://mattermost.com/community/'
++                href='https://mattermore.dev'
+             >
+-                {'mattermost.com/community/'}
++                {'mattermore.dev'}
+             </ExternalLink>
+         </div>
+     );
+@@ -137,15 +137,15 @@ export default function AboutBuildModal(props: Props) {
+                 <div>
+                     <FormattedMessage
+                         id='about.planNameLearn'
+-                        defaultMessage='Learn more about Mattermost {planName} at {link}'
++                        defaultMessage='Learn more about Mattermore {planName} at {link}'
+                         values={{
+                             planName: skuName,
+                             link: (
+                                 <ExternalLink
+                                     location='about_build_modal'
+-                                    href='https://mattermost.com/'
++                                    href='https://mattermore.dev'
+                                 >
+-                                    {'mattermost.com'}
++                                    {'mattermore.dev'}
+                                 </ExternalLink>
+                             ),
+                         }}
+@@ -171,9 +171,9 @@ export default function AboutBuildModal(props: Props) {
+                             link: (
+                                 <ExternalLink
+                                     location='about_build_modal'
+-                                    href='https://mattermost.com/'
++                                    href='https://mattermore.dev'
+                                 >
+-                                    {'mattermost.com'}
++                                    {'mattermore.dev'}
+                                 </ExternalLink>
+                             ),
+                         }}
+diff --git a/webapp/channels/src/utils/constants.tsx b/webapp/channels/src/utils/constants.tsx
+index d47bbbee..09e7d43b 100644
+--- a/webapp/channels/src/utils/constants.tsx
++++ b/webapp/channels/src/utils/constants.tsx
+@@ -1049,8 +1049,8 @@ export const DraggingStateTypes = {
+ };
+ 
+ export const AboutLinks = {
+-    TERMS_OF_SERVICE: 'https://mattermost.com/pl/terms-of-use/',
+-    PRIVACY_POLICY: 'https://mattermost.com/pl/privacy-policy/',
++    TERMS_OF_SERVICE: 'https://mattermore.dev',
++    PRIVACY_POLICY: 'https://mattermore.dev',
+ };
+ 
+ export const CloudLinks = {

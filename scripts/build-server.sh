@@ -24,6 +24,10 @@ for patch in "$ROOT"/patches/server/*.patch; do
     git -C "$WORK" apply "$patch"
 done
 
+# The marks are images, not code, so they are copied rather than patched. They
+# are committed already rendered, so this needs no image tooling.
+"$ROOT/scripts/brand-assets.sh" apply "$WORK"
+
 # Upstream's own build does this and gitignores the result: the server module
 # depends on server/public, and without a workspace Go resolves it to the
 # published version, which lags the tree and fails to compile.

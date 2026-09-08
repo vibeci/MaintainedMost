@@ -29,10 +29,22 @@ RUN set -eu; \
         fi; \
     done
 
+# The image ships a fully written config.json, so every default our patches set
+# in Go is already spelled out in that file and never reached. Patching the Go
+# constant stays right for anyone building from source; this makes it true for
+# the image too. Only the keys in config/overrides.json change.
+FROM docker.io/library/alpine:3.20 AS config
+RUN apk add --no-cache python3
+COPY --from=upstream /mattermost/config/config.json /in.json
+COPY config/overrides.json /overrides.json
+COPY scripts/merge-config.py /merge.py
+RUN python3 /merge.py /in.json /overrides.json /out.json
+
 FROM docker.io/mattermost/mattermost-team-edition:latest
 
 COPY --chown=2000:2000 mattermore-server /mattermost/bin/mattermost
 COPY --from=webapp --chown=2000:2000 /out /mattermost/client
+COPY --from=config --chown=2000:2000 --chmod=600 /out.json /mattermost/config/config.json
 
 # The plugin ships as a prepackaged bundle. Upstream refuses one without a
 # signature made with Mattermost's key, which no third party can produce, so

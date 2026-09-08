@@ -1,0 +1,22 @@
+{
+  "TeamSettings": {
+    "SiteName": "Mattermore"
+  },
+  "SupportSettings": {
+    "AboutLink": "https://mattermore.dev",
+    "HelpLink": "https://mattermore.dev/docs",
+    "ReportAProblemLink": "https://github.com/dennisklappe/mattermore/issues",
+    "TermsOfServiceLink": "",
+    "PrivacyPolicyLink": ""
+  },
+  "NativeAppSettings": {
+    "AppDownloadLink": "https://mattermore.dev/#app-grid",
+    "AndroidAppDownloadLink": "https://play.google.com/store/apps/details?id=com.mattermost.rn",
+    "IosAppDownloadLink": "https://apps.apple.com/app/mattermost/id1257222717"
+  },
+  "PluginSettings": {
+    "PluginStates": {
+      "mattermost-ai": { "Enable": false }
+    }
+  }
+}
