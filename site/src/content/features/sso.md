@@ -2,7 +2,7 @@
 title: "Single sign-on for self-hosted Mattermost"
 description: "Why Mattermost SSO needs a paid licence, why the GitLab OAuth workaround fails, and the OpenID Connect provider Mattermore wrote to fix it."
 label: "Single sign-on"
-order: 6
+order: 7
 ---
 
 Mattermost ships a lot of authentication code, and almost none of it is

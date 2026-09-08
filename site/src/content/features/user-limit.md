@@ -2,7 +2,7 @@
 title: "Raising the user limit on self-hosted Mattermost"
 description: "Mattermost Team Edition caps an unlicensed server at 250 users. Where the cap lives, how much it tightened in v11, and how Mattermore raises it."
 label: "User limit"
-order: 7
+order: 8
 ---
 
 In v11 Mattermost cut the user cap on an unlicensed self-hosted server to 250,

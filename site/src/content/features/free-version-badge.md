@@ -2,7 +2,7 @@
 title: "Remove the Free Version badge from self-hosted Mattermost"
 description: "Mattermost shows a Free Version label and an unsupported version notice in the web app. Mattermore removes both. Cosmetic, honestly described."
 label: "Licence badges"
-order: 9
+order: 10
 ---
 
 Self-hosted Mattermost puts licence-tier branding in the interface. A "Free

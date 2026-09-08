@@ -1,0 +1,56 @@
+diff --git a/server/channels/api4/channel.go b/server/channels/api4/channel.go
+index 84d569e1..c2916340 100644
+--- a/server/channels/api4/channel.go
++++ b/server/channels/api4/channel.go
+@@ -2969,12 +2969,9 @@ func channelMemberCountsByGroup(c *Context, w http.ResponseWriter, r *http.Reque
+ 	}
+ }
+ 
++// Channel moderation is permission bookkeeping the server already does for
++// every channel, so Mattermore does not ask for a licence before showing it.
+ func getChannelModerations(c *Context, w http.ResponseWriter, r *http.Request) {
+-	if c.App.Channels().License() == nil {
+-		c.Err = model.NewAppError("Api4.GetChannelModerations", "api.channel.get_channel_moderations.license.error", nil, "", http.StatusForbidden)
+-		return
+-	}
+-
+ 	c.RequireChannelId()
+ 	if c.Err != nil {
+ 		return
+@@ -3009,11 +3006,6 @@ func getChannelModerations(c *Context, w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ func patchChannelModerations(c *Context, w http.ResponseWriter, r *http.Request) {
+-	if c.App.Channels().License() == nil {
+-		c.Err = model.NewAppError("Api4.patchChannelModerations", "api.channel.patch_channel_moderations.license.error", nil, "", http.StatusForbidden)
+-		return
+-	}
+-
+ 	c.RequireChannelId()
+ 	if c.Err != nil {
+ 		return
+diff --git a/webapp/channels/src/components/admin_console/team_channel_settings/channel/details/index.ts b/webapp/channels/src/components/admin_console/team_channel_settings/channel/details/index.ts
+index f8e3c334..ab2ecfdf 100644
+--- a/webapp/channels/src/components/admin_console/team_channel_settings/channel/details/index.ts
++++ b/webapp/channels/src/components/admin_console/team_channel_settings/channel/details/index.ts
+@@ -39,7 +39,7 @@ import {getTeam} from 'mattermost-redux/selectors/entities/teams';
+ import {setNavigationBlocked} from 'actions/admin_actions';
+ import {isChannelAccessControlEnabled} from 'selectors/general';
+ 
+-import {isMinimumEnterpriseAdvancedLicense, isMinimumEnterpriseLicense, isMinimumProfessionalLicense} from 'utils/license_utils';
++import {isMinimumEnterpriseAdvancedLicense, isMinimumEnterpriseLicense} from 'utils/license_utils';
+ 
+ import type {GlobalState} from 'types/store';
+ 
+@@ -59,8 +59,9 @@ function mapStateToProps(state: GlobalState, ownProps: OwnProps) {
+ 
+     const isLicensed = license?.IsLicensed === 'true';
+ 
+-    // Channel Moderation is only available for Professional and above
+-    const channelModerationEnabled = isLicensed && isMinimumProfessionalLicense(license);
++    // Mattermore lifts the licence gate on channel moderation, so the panel is
++    // always shown. The server no longer refuses the calls behind it either.
++    const channelModerationEnabled = true;
+ 
+     // Channel Groups is only available for Enterprise and above
+     const channelGroupsEnabled = isLicensed && isMinimumEnterpriseLicense(license);

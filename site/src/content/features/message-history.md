@@ -2,7 +2,7 @@
 title: "Unlimited message history on self-hosted Mattermost"
 description: "Mattermost v11 caps history at 10,000 messages under an Entry licence. Here is where the cap lives, and why a Team Edition base never hits it."
 label: "Message history"
-order: 8
+order: 9
 ---
 
 Mattermost v11 introduced a 10,000 message history cap. Your older posts are
