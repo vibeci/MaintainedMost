@@ -1,0 +1,17 @@
+diff --git a/server/public/model/config.go b/server/public/model/config.go
+index 7f865ed8..68f5021b 100644
+--- a/server/public/model/config.go
++++ b/server/public/model/config.go
+@@ -3699,8 +3699,10 @@ func (s *PluginSettings) SetDefaults(ls LogSettings) {
+ 	}
+ 
+ 	if s.PluginStates[PluginIdAI] == nil {
+-		// Enable the AI plugin by default
+-		s.PluginStates[PluginIdAI] = &PluginState{Enable: true}
++		// Off until an admin wants it. The plugin does nothing without an LLM
++		// configured, so enabling it by default only adds an empty product to
++		// the sidebar. System Console > Plugins turns it on.
++		s.PluginStates[PluginIdAI] = &PluginState{Enable: false}
+ 	}
+ 
+ 	if s.EnableMarketplace == nil {

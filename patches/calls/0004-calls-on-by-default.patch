@@ -1,0 +1,28 @@
+diff --git a/server/configuration.go b/server/configuration.go
+index 3b2c712..1988776 100644
+--- a/server/configuration.go
++++ b/server/configuration.go
+@@ -200,8 +200,10 @@ func (c *configuration) SetDefaults() {
+ 
+ 	c.AllowEnableCalls = model.NewPointer(true)
+ 
++	// Mattermore ships calls usable out of the box, so they are on in every
++	// channel unless an admin turns them off.
+ 	if c.DefaultEnabled == nil {
+-		c.DefaultEnabled = model.NewPointer(false)
++		c.DefaultEnabled = model.NewPointer(true)
+ 	}
+ 	if c.MaxCallParticipants == nil {
+ 		c.MaxCallParticipants = model.NewPointer(0) // unlimited
+@@ -266,8 +268,10 @@ func (c *configuration) SetDefaults() {
+ 	if c.EnableDCSignaling == nil {
+ 		c.EnableDCSignaling = model.NewPointer(false)
+ 	}
++	// Group video is the reason most people install Mattermore, and hiding the
++	// camera button behind a console toggle makes it look missing.
+ 	if c.EnableVideo == nil {
+-		c.EnableVideo = model.NewPointer(false)
++		c.EnableVideo = model.NewPointer(true)
+ 	}
+ }
+ 
