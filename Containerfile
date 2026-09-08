@@ -40,21 +40,33 @@ COPY config/overrides.json /overrides.json
 COPY scripts/merge-config.py /merge.py
 RUN python3 /merge.py /in.json /overrides.json /out.json
 
+# The prepackaged plugins, with exactly one bundle per plugin id.
+#
+# Upstream's calls bundle is removed rather than left to lose on version.
+# Winning on version describes where a start ends up, not how it gets there:
+# with both present the server installs upstream's first and then has to remove
+# it again to put ours in its place, and that removal can fail. When it does,
+# the install is abandoned and the plugin directory is left holding an orphan
+# webapp folder with no manifest and no binary, so the server comes up with no
+# calls plugin at all:
+#
+#   Removing existing installation of plugin before local install (1.12.2)
+#   removePlugin: unlinkat plugins/com.mattermost.calls: directory not empty
+#
+# The base image has no shell, so this is done in a stage and copied in, the
+# same way the web app is.
+FROM docker.io/library/alpine:3.20 AS plugins
+COPY --from=upstream /mattermost/prepackaged_plugins /out
+COPY mattermore-calls.tar.gz /out/mattermore-calls-linux-amd64.tar.gz
+RUN rm -f /out/mattermost-plugin-calls-v*.tar.gz /out/mattermost-plugin-calls-v*.tar.gz.sig
+
 FROM docker.io/mattermost/mattermost-team-edition:latest
 
 COPY --chown=2000:2000 mattermore-server /mattermost/bin/mattermost
 COPY --from=webapp --chown=2000:2000 /out /mattermost/client
 COPY --from=config --chown=2000:2000 --chmod=600 /out.json /mattermost/config/config.json
+COPY --from=plugins --chown=2000:2000 /out /mattermost/prepackaged_plugins
 
-# The plugin ships as a prepackaged bundle. Upstream refuses one without a
-# signature made with Mattermost's key, which no third party can produce, so
-# patches/server/0007 makes the signature optional for prepackaged plugins
-# while still verifying one that is present. RequirePluginSignature continues
-# to govern administrator uploads, which is a different trust boundary.
-#
-# The stock calls bundle is left in place deliberately: ours is version
-# 1000.12.3 and wins on version, so there is nothing to delete.
-COPY --chown=2000:2000 mattermore-calls.tar.gz /mattermost/prepackaged_plugins/mattermore-calls-linux-amd64.tar.gz
 
 # Group calls are switched on by upstream's own environment variable.
 ENV MM_CALLS_GROUP_CALLS_ALLOWED=true

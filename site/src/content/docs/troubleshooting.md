@@ -97,6 +97,40 @@ prepackages. Confirm what is installed in System Console > Plugins > Calls. Our
 build shows as "Calls (Mattermore)". If it shows plain "Calls", reinstall
 Mattermore.
 
+## No calls plugin at all after an upgrade
+
+The call button is gone, the System Console lists no Calls plugin, and
+`mmctl plugin list` shows an empty enabled list.
+
+Images before the fix for this shipped **two** bundles for the same plugin id,
+Mattermore's and upstream's. On start the server installed upstream's first and
+then removed it again to put Mattermore's in place, and that removal can fail:
+
+```
+Removing existing installation of plugin before local install (existing_version 1.12.2)
+removePlugin: Unable to delete plugin., unlinkat plugins/com.mattermost.calls: directory not empty
+```
+
+The install is abandoned and what is left behind is a `com.mattermost.calls`
+directory holding an orphan `webapp` folder, with no manifest and no binary.
+
+Upgrading to an image that carries only one calls bundle stops it happening
+again, but the leftover directory has to be cleared by hand, because that is
+the thing the server cannot delete:
+
+```bash
+docker compose stop mattermost
+docker run --rm -v <project>_plugins:/p -v <project>_client-plugins:/c \
+  alpine sh -c 'rm -rf /p/com.mattermost.calls /c/com.mattermost.calls'
+docker compose start mattermost
+sleep 60
+docker compose exec -T mattermost /mattermost/bin/mmctl --local plugin list
+```
+
+The last command must report `Calls (Mattermore), Version: 1000.x.y`. Nothing
+else is lost: call settings live in the server config, not in the plugin
+directory.
+
 ## Large calls degrade
 
 Above roughly 50 participants, quality falls off.
