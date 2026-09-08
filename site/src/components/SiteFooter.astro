@@ -1,13 +1,16 @@
 ---
 import { getCollection } from 'astro:content';
 import BrandMark from './BrandMark.astro';
+import UpdateSignup from './UpdateSignup.astro';
 
 interface Props {
   /** Overrides the "corrections welcome" line for pages that live elsewhere in the repo. */
   blurb?: string;
+  /** Off on pages that already carry the signup, so nobody is asked twice. */
+  signup?: boolean;
 }
 
-const { blurb } = Astro.props;
+const { blurb, signup = true } = Astro.props;
 
 const features = (await getCollection('features')).sort((a, b) => a.data.order - b.data.order);
 
@@ -34,6 +37,14 @@ const project = [
       <div class="foot-brand">
         <a class="brand" href="/"><BrandMark />Mattermore</a>
         <p>Mattermost, but more. A maintained fork that turns the paywalled parts back on, changing only AGPL code.</p>
+        {signup && (
+          <UpdateSignup
+            source="footer"
+            variant="compact"
+            heading="Release mail"
+            blurb="One mail when a release matters, especially an upstream security fix."
+          />
+        )}
       </div>
 
       <nav aria-label="Features">

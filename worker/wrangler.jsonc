@@ -3,5 +3,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-01-01",
   "workers_dev": true,
-  "observability": { "enabled": true }
+  "routes": [{ "pattern": "api.mattermore.dev", "custom_domain": true }],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mattermore-subscribers",
+      "database_id": "b2042bce-2a11-4ca3-9dfe-4f6a08eb6be7"
+    }
+  ]
 }

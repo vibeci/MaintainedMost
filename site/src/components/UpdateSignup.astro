@@ -1,0 +1,218 @@
+---
+import { FORM_ENDPOINT } from '../config/balie';
+import { TURNSTILE_SITEKEY } from '../config/subscribe';
+
+interface Props {
+  /** Where on the site this instance sits, so we can see what actually works. */
+  source: string;
+  /** 'compact' for the footer column, 'inline' for a full row, 'card' to box it. */
+  variant?: 'compact' | 'inline' | 'card';
+  heading?: string;
+  blurb?: string;
+}
+
+const {
+  source,
+  variant = 'inline',
+  heading = 'Get told about security fixes',
+  blurb = 'Mattermore tracks upstream Mattermost. One mail when a release matters, nothing else.',
+} = Astro.props;
+
+const id = `sub-${source}`;
+---
+<section class={`update-signup ${variant}`} aria-labelledby={`${id}-h`}>
+  <div class="us-copy">
+    <p class="us-head" id={`${id}-h`}>{heading}</p>
+    <p class="us-blurb">{blurb}</p>
+  </div>
+
+  <form class="us-form" data-source={source} novalidate>
+    <label class="visually-hidden" for={`${id}-email`}>Email address</label>
+    <input id={`${id}-email`} name="email" type="email" autocomplete="email"
+           placeholder="you@example.com" required />
+    <!-- Never shown, so anything in it came from a bot. -->
+    <div class="us-hp" aria-hidden="true">
+      <label for={`${id}-website`}>Website</label>
+      <input id={`${id}-website`} name="website" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+    <button class="btn btn-primary" type="submit">Subscribe</button>
+    <div class="us-turnstile"></div>
+    <p class="us-note" role="status" aria-live="polite"></p>
+  </form>
+</section>
+
+<style>
+  .update-signup { --us-gap: 0.6rem; }
+
+  /* The footer column is narrow, so the ask shrinks to a label and one row. */
+  .update-signup.compact { margin-top: 1.2rem; --us-gap: 0.45rem; }
+  .update-signup.compact .us-head { font-size: 0.82rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink); }
+  .update-signup.compact .us-blurb { font-size: 0.85rem; margin-bottom: 0.7rem; max-width: 26rem; }
+  .update-signup.compact .us-form input[type='email'] { flex: 1 1 10rem; padding: 0.5rem 0.7rem; font-size: 0.9rem; }
+  .update-signup.compact .us-form .btn { padding: 0.5rem 0.9rem; font-size: 0.9rem; }
+
+  .update-signup.card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 1.4rem 1.5rem;
+    background: var(--bg);
+  }
+
+  .us-head {
+    margin: 0 0 0.2rem;
+    font-weight: 650;
+    font-size: 1rem;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  .us-blurb {
+    margin: 0 0 0.9rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 46ch;
+  }
+
+  .us-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--us-gap);
+    align-items: center;
+  }
+
+  .us-form input[type='email'] {
+    flex: 1 1 15rem;
+    min-width: 0;
+    padding: 0.62rem 0.8rem;
+    font: inherit;
+    font-size: 0.94rem;
+    color: var(--ink);
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  .us-form input[type='email']:focus-visible {
+    background: #fff;
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+  }
+
+  .us-form .btn { flex: 0 0 auto; }
+  .us-form .btn[disabled] { opacity: 0.6; cursor: progress; }
+
+  /* Turnstile is invisible until it decides otherwise, so this stays empty. */
+  .us-turnstile:empty { display: none; }
+  .us-turnstile { flex: 1 0 100%; }
+
+  .us-hp {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .us-note {
+    flex: 1 0 100%;
+    margin: 0;
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  .us-note:empty { display: none; }
+  .us-note[data-state='bad'] { color: var(--red); }
+  .us-note[data-state='good'] { color: var(--brand-dark); }
+</style>
+
+<script is:inline define:vars={{ FORM_ENDPOINT, TURNSTILE_SITEKEY }}>
+  (function () {
+    var forms = document.querySelectorAll('.us-form:not([data-wired])');
+    if (!forms.length) return;
+
+    // One script tag for the whole page, loaded only once even with several
+    // signup blocks on it.
+    if (!window.__turnstileLoading) {
+      window.__turnstileLoading = true;
+      var s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    }
+
+    function challenge(form) {
+      // Resolves with a token, or with an empty string when Turnstile cannot
+      // run at all. The worker decides what to do with that, not the browser.
+      return new Promise(function (resolve) {
+        if (!window.turnstile) return resolve('');
+        var mount = form.querySelector('.us-turnstile');
+        var done = false;
+        var finish = function (token) {
+          if (done) return;
+          done = true;
+          resolve(token || '');
+        };
+        try {
+          window.turnstile.render(mount, {
+            sitekey: TURNSTILE_SITEKEY,
+            appearance: 'interaction-only',
+            callback: finish,
+            'error-callback': function () { finish(''); },
+            'timeout-callback': function () { finish(''); },
+          });
+        } catch (err) {
+          finish('');
+        }
+        setTimeout(function () { finish(''); }, 8000);
+      });
+    }
+
+    forms.forEach(function (form) {
+      form.setAttribute('data-wired', '');
+      var note = form.querySelector('.us-note');
+      var button = form.querySelector('button[type="submit"]');
+      var email = form.querySelector('input[type="email"]');
+
+      var say = function (text, state) {
+        note.textContent = text;
+        if (state) note.setAttribute('data-state', state);
+        else note.removeAttribute('data-state');
+      };
+
+      form.addEventListener('submit', async function (ev) {
+        ev.preventDefault();
+        if (!email.value || email.value.indexOf('@') < 1) {
+          say('That does not look like an email address.', 'bad');
+          return;
+        }
+
+        button.disabled = true;
+        say('One moment.');
+
+        try {
+          var token = await challenge(form);
+          var res = await fetch(FORM_ENDPOINT + '/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email.value.trim(),
+              website: form.querySelector('.us-hp input').value,
+              source: form.getAttribute('data-source'),
+              turnstile: token,
+            }),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          form.reset();
+          say('Check your inbox and confirm the address. Nothing is sent until you do.', 'good');
+        } catch (err) {
+          say('That did not go through. Try again, or mail hosting@mattermore.dev.', 'bad');
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+  })();
+</script>

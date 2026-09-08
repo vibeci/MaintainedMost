@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+import TopBar from './TopBar.astro';
+import SiteFooter from './SiteFooter.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  heading: string;
+  /** Off where asking again would be absurd, such as right after confirming. */
+  signup?: boolean;
+}
+
+const { title, description, heading, signup = false } = Astro.props;
+---
+<Base title={title} description={description}>
+  <TopBar />
+  <main id="main">
+    <section class="outcome">
+      <div class="shell">
+        <h1>{heading}</h1>
+        <slot />
+        <p class="cta"><a class="btn btn-primary" href="/">Back to Mattermore</a></p>
+      </div>
+    </section>
+  </main>
+  <SiteFooter signup={signup} />
+</Base>
+
+<style>
+  .outcome { padding: 5rem 0 6rem; }
+  .outcome h1 { margin: 0 0 0.7rem; font-size: 1.9rem; letter-spacing: -0.02em; }
+  .outcome :global(p) { margin: 0 0 0.7rem; max-width: 54ch; color: var(--body); line-height: 1.65; }
+  .outcome .cta { margin-top: 1.4rem; }
+</style>
