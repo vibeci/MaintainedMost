@@ -1,0 +1,19 @@
+diff --git a/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx b/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
+index 69867da6..f3b9b897 100644
+--- a/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
++++ b/webapp/channels/src/components/sidebar/sidebar_category/sidebar_category.tsx
+@@ -263,7 +263,13 @@ export default class SidebarCategory extends React.PureComponent<Props, State> {
+             return null;
+         }
+ 
+-        if (category.type === CategoryTypes.FAVORITES && !channelIds?.length) {
++        // Upstream hides an empty Favourites, and an empty Channels is the same
++        // thing: a heading over nothing but its own Add Channels button, which
++        // the + at the top of the sidebar already offers. Custom categories
++        // stay, because an empty one is a deliberate drop target.
++        const isEmptyBuiltIn = category.type === CategoryTypes.FAVORITES ||
++            category.type === CategoryTypes.CHANNELS;
++        if (isEmptyBuiltIn && !channelIds?.length && !isNewCategory) {
+             return null;
+         }
+ 
