@@ -1,10 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 64" width="470" height="64" role="img" aria-label="Mattermore">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 64" width="500" height="64" role="img" aria-label="Mattermore">
   <title>Mattermore</title>
-  <g transform="translate(0 6)">
-    <circle cx="26" cy="26" r="26" fill="#8a949f"/>
-    <circle cx="62" cy="26" r="22.5" fill="#8a949f" stroke="#ffffff" stroke-width="7"/>
-    <circle cx="98" cy="26" r="22.5" fill="#8a949f" stroke="#ffffff" stroke-width="7"/>
-  </g>
-  <text x="130" y="49" font-family="'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+  <defs>
+    <mask id="mm-a">
+      <rect width="500" height="64" fill="#fff"/>
+      <circle cx="64" cy="32" r="33" fill="#000"/>
+    </mask>
+    <mask id="mm-b">
+      <rect width="500" height="64" fill="#fff"/>
+      <circle cx="100" cy="32" r="33" fill="#000"/>
+    </mask>
+  </defs>
+  <circle cx="28" cy="32" r="26" fill="#8a949f" mask="url(#mm-a)"/>
+  <circle cx="64" cy="32" r="26" fill="#8a949f" mask="url(#mm-b)"/>
+  <circle cx="100" cy="32" r="26" fill="#8a949f"/>
+  <text x="144" y="51" font-family="'Open Sans', Onest, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
         font-size="56" font-weight="700" letter-spacing="-1.8" fill="#8a949f">Mattermore</text>
 </svg>

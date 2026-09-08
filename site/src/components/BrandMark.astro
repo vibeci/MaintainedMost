@@ -1,11 +1,26 @@
 ---
 // Three circles: two people, then the third one Mattermost will not let in.
 // That third circle is the whole product, so it carries the accent colour.
+//
+// The gaps are cut out with a mask rather than drawn as a light ring, so the
+// same mark sits on any background. Ids are per instance, because a page
+// renders this more than once.
 interface Props { class?: string }
 const { class: className = 'brand-mark' } = Astro.props;
+const uid = Math.random().toString(36).slice(2, 8);
 ---
-<svg class={className} viewBox="0 0 42 24" aria-hidden="true" focusable="false">
-  <circle cx="9" cy="12" r="8" fill="#10161c" />
-  <circle cx="20" cy="12" r="8" fill="#10161c" stroke="#fff" stroke-width="2.5" />
-  <circle cx="31" cy="12" r="8" fill="#0c8f63" stroke="#fff" stroke-width="2.5" />
+<svg class={className} viewBox="0 0 126 64" aria-hidden="true" focusable="false">
+  <defs>
+    <mask id={`mm-a-${uid}`}>
+      <rect width="126" height="64" fill="#fff"/>
+      <circle cx="64" cy="32" r="33" fill="#000"/>
+    </mask>
+    <mask id={`mm-b-${uid}`}>
+      <rect width="126" height="64" fill="#fff"/>
+      <circle cx="100" cy="32" r="33" fill="#000"/>
+    </mask>
+  </defs>
+  <circle cx="28" cy="32" r="26" fill="#10161c" mask={`url(#mm-a-${uid})`}/>
+  <circle cx="64" cy="32" r="26" fill="#10161c" mask={`url(#mm-b-${uid})`}/>
+  <circle cx="100" cy="32" r="26" fill="#0c8f63"/>
 </svg>

@@ -16,7 +16,7 @@ const path = Astro.url.pathname.replace(/\.html$/, '').replace(/\/index$/, '');
 const canonical = path ? new URL(path, Astro.site).href : Astro.site!.href;
 
 const favicon =
-  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2310161c'/><circle cx='8' cy='16' r='4.4' fill='%23ffffff'/><circle cx='17' cy='16' r='4.4' fill='%23ffffff' opacity='.55'/><circle cx='25.5' cy='16' r='4.4' fill='%2319b37b'/></svg>";
+  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='128' height='128' rx='28' fill='%2310161c'/><circle cx='30' cy='64' r='17' fill='%23ffffff'/><circle cx='64' cy='64' r='17' fill='%23ffffff'/><circle cx='98' cy='64' r='17' fill='%2319b37b'/></svg>";
 ---
 <!doctype html>
 <html lang="en">

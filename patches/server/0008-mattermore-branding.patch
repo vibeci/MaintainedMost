@@ -12,7 +12,7 @@ index 711f6eca..9d27ea74 100644
  	TeamSettingsDefaultCustomBrandText       = ""
  	TeamSettingsDefaultCustomDescriptionText = ""
 diff --git a/webapp/channels/src/components/common/svg_images_components/logo_dark_blue_svg.tsx b/webapp/channels/src/components/common/svg_images_components/logo_dark_blue_svg.tsx
-index 523e2056..85678a8e 100644
+index 523e2056..6c103b72 100644
 --- a/webapp/channels/src/components/common/svg_images_components/logo_dark_blue_svg.tsx
 +++ b/webapp/channels/src/components/common/svg_images_components/logo_dark_blue_svg.tsx
 @@ -1,4 +1,4 @@
@@ -21,21 +21,22 @@ index 523e2056..85678a8e 100644
  // See LICENSE.txt for license information.
  
  import React from 'react';
-@@ -16,26 +16,34 @@ const Svg = styled.svg.attrs({
+@@ -16,26 +16,43 @@ const Svg = styled.svg.attrs({
      xmlnsXlink: 'http://www.w3.org/1999/xlink',
  })``;
  
-+// The wordmark is drawn as text rather than outlines so it picks up the font
-+// the rest of the product is already loading.
++// The circles overlap, and the gap between them is cut out with a mask rather
++// than drawn as a light ring, so the same mark works on any background. Colour
++// is inherited, so it follows the theme instead of vanishing into a dark one.
  export default (props: Props) => (
      <Svg
          className={props.className}
 -        width={props.width ? props.width.toString() : '182'}
 -        height={props.height ? props.height.toString() : '30'}
 -        viewBox='0 0 182 30'
-+        width={props.width ? props.width.toString() : '196'}
++        width={props.width ? props.width.toString() : '208'}
 +        height={props.height ? props.height.toString() : '27'}
-+        viewBox='0 0 470 64'
++        viewBox='0 0 500 64'
          fill='none'
          xmlns='http://www.w3.org/2000/svg'
 +        role='img'
@@ -53,19 +54,27 @@ index 523e2056..85678a8e 100644
 -            d='M20.1373 12.2575C20.1373 12.2575 20.1838 14.3044 18.7644 15.695C17.3448 17.0856 15.6012 16.9585 14.467 16.5745C13.3326 16.1905 11.8704 15.2323 11.5873 13.2655C11.3045 11.2986 12.5848 9.70069 12.5848 9.70069L15.3747 6.23118L16.9996 4.24963L18.3944 2.52282C18.3944 2.52282 19.0345 1.66544 19.2169 1.48849C19.2531 1.45342 19.2901 1.43042 19.3265 1.4127L19.3529 1.39919L19.3577 1.39736C19.4344 1.36431 19.5228 1.35719 19.6081 1.38604C19.6915 1.41435 19.7562 1.47169 19.7971 1.54236L19.8056 1.55605L19.8131 1.57176C19.833 1.60938 19.8496 1.65229 19.8575 1.70525C19.8948 1.95671 19.8825 3.02665 19.8825 3.02665L19.9415 5.24543L20.0286 7.8066L20.1373 12.2575ZM23.7488 2.86301C28.9088 6.61849 31.2753 13.4339 29.1235 19.8082C26.4751 27.653 17.9863 31.8597 10.1633 29.2041C2.34031 26.5484 -1.85455 18.0361 0.79367 10.1914C2.9491 3.80658 8.97324 -0.167855 15.3585 0.00544665L13.3118 2.43039C9.52375 3.11721 6.25309 5.71126 4.96759 9.51933C3.05491 15.185 6.26074 21.3926 12.1281 23.3842C17.9952 25.376 24.3022 22.3977 26.2149 16.7321C27.4962 12.9366 26.4802 8.89825 23.9063 6.04672L23.7488 2.86301Z'
 -            fill='#1E325C'
 -        />
-+        <g transform='translate(0 6)'>
-+            <circle cx='26' cy='26' r='26' fill='#10161C'/>
-+            <circle cx='62' cy='26' r='26' fill='#10161C' fillOpacity='.55'/>
-+            <circle cx='98' cy='26' r='26' fill='#0C8F63'/>
-+        </g>
++        <defs>
++            <mask id='mattermore-mark-a'>
++                <rect width='500' height='64' fill='#fff'/>
++                <circle cx='64' cy='32' r='33' fill='#000'/>
++            </mask>
++            <mask id='mattermore-mark-b'>
++                <rect width='500' height='64' fill='#fff'/>
++                <circle cx='100' cy='32' r='33' fill='#000'/>
++            </mask>
++        </defs>
++        <circle cx='28' cy='32' r='26' fill='currentColor' mask='url(#mattermore-mark-a)'/>
++        <circle cx='64' cy='32' r='26' fill='currentColor' mask='url(#mattermore-mark-b)'/>
++        <circle cx='100' cy='32' r='26' fill='#19B37B'/>
 +        <text
-+            x='126'
-+            y='49'
++            x='144'
++            y='51'
 +            fontFamily="'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 +            fontSize='56'
 +            fontWeight='700'
 +            letterSpacing='-1.8'
-+            fill='#10161C'
++            fill='currentColor'
 +        >
 +            {'Mattermore'}
 +        </text>
@@ -94,7 +103,7 @@ index dda43fb5..3f87f2bd 100644
              title = '';
          } else {
 diff --git a/webapp/channels/src/components/widgets/icons/mattermost_logo.tsx b/webapp/channels/src/components/widgets/icons/mattermost_logo.tsx
-index 7543811f..7bd49aa8 100644
+index 7543811f..edef1c62 100644
 --- a/webapp/channels/src/components/widgets/icons/mattermost_logo.tsx
 +++ b/webapp/channels/src/components/widgets/icons/mattermost_logo.tsx
 @@ -1,10 +1,11 @@
@@ -111,7 +120,7 @@ index 7543811f..7bd49aa8 100644
  export default function MattermostLogo(props: React.HTMLAttributes<HTMLSpanElement>) {
      const {formatMessage} = useIntl();
      return (
-@@ -14,28 +15,13 @@ export default function MattermostLogo(props: React.HTMLAttributes<HTMLSpanEleme
+@@ -14,28 +15,23 @@ export default function MattermostLogo(props: React.HTMLAttributes<HTMLSpanEleme
                  x='0px'
                  y='0px'
                  viewBox='0 0 500 500'
@@ -132,8 +141,18 @@ index 7543811f..7bd49aa8 100644
 -                        d='M335.6,204.3l-1.8-74.2l-1.5-42.7l-1-37c0,0,0.2-17.8-0.4-22c-0.1-0.9-0.4-1.6-0.7-2.2 c0-0.1-0.1-0.2-0.1-0.3c0-0.1-0.1-0.2-0.1-0.2c-0.7-1.2-1.8-2.1-3.1-2.6c-1.4-0.5-2.9-0.4-4.2,0.2c0,0-0.1,0-0.1,0 c-0.2,0.1-0.3,0.1-0.4,0.2c-0.6,0.3-1.2,0.7-1.8,1.3c-3,3-13.7,17.2-13.7,17.2l-23.2,28.8l-27.1,33l-46.5,57.8 c0,0-21.3,26.6-16.6,59.4s29.1,48.7,48,55.1c18.9,6.4,48,8.5,71.6-14.7C336.4,238.4,335.6,204.3,335.6,204.3z'
 -                    />
 -                </g>
-+                <circle cx='140' cy='250' r='78'/>
-+                <circle cx='250' cy='250' r='78' fillOpacity='.55'/>
++                <defs>
++                    <mask id='mattermore-icon-a'>
++                        <rect width='500' height='500' fill='#fff'/>
++                        <circle cx='250' cy='250' r='100' fill='#000'/>
++                    </mask>
++                    <mask id='mattermore-icon-b'>
++                        <rect width='500' height='500' fill='#fff'/>
++                        <circle cx='360' cy='250' r='100' fill='#000'/>
++                    </mask>
++                </defs>
++                <circle cx='140' cy='250' r='78' mask='url(#mattermore-icon-a)'/>
++                <circle cx='250' cy='250' r='78' mask='url(#mattermore-icon-b)'/>
 +                <circle cx='360' cy='250' r='78'/>
              </svg>
          </span>
