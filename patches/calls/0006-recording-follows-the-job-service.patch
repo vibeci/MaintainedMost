@@ -1,0 +1,22 @@
+diff --git a/server/configuration.go b/server/configuration.go
+index 1988776..46aaf80 100644
+--- a/server/configuration.go
++++ b/server/configuration.go
+@@ -217,11 +217,15 @@ func (c *configuration) SetDefaults() {
+ 	if c.AllowScreenSharing == nil {
+ 		c.AllowScreenSharing = model.NewPointer(true)
+ 	}
++	// Recording and transcription need a job service to run them, and that is
++	// the only reason they were ever a decision. So they follow it: configure
++	// one and both are on, run without one and neither button appears.
++	hasJobService := c.getJobServiceURL() != ""
+ 	if c.EnableRecordings == nil {
+-		c.EnableRecordings = model.NewPointer(false)
++		c.EnableRecordings = model.NewPointer(hasJobService)
+ 	}
+ 	if c.EnableTranscriptions == nil {
+-		c.EnableTranscriptions = model.NewPointer(false)
++		c.EnableTranscriptions = model.NewPointer(hasJobService)
+ 	}
+ 	if c.TranscriberNumThreads == nil {
+ 		c.TranscriberNumThreads = model.NewPointer(transcriber.NumThreadsDefault)

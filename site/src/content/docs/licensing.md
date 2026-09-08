@@ -1,7 +1,7 @@
 ---
 title: "Licensing and legality"
 description: "Why Mattermore is legal: it modifies AGPL code only, never the Source Available Licence, and documents a switch Mattermost ships itself."
-order: 7
+order: 8
 ---
 
 ## The short version

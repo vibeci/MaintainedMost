@@ -1,7 +1,7 @@
 ---
 title: "Troubleshooting"
 description: "Fixes for the common Mattermore problems: a missing call button, calls that drop, rejected plugin uploads and lost upgrades."
-order: 6
+order: 7
 ---
 
 ## Where to look first

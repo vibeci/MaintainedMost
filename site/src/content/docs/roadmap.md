@@ -1,7 +1,7 @@
 ---
 title: "Roadmap"
 description: "What Mattermore does today, why group video is not simply a licence check, and where the live plan is tracked."
-order: 8
+order: 9
 ---
 
 Planning happens on GitHub, not here. This page explains what works today and

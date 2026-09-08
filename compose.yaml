@@ -1,0 +1,86 @@
+# Mattermore, with everything the advertised features need.
+#
+#   cp .env.example .env   # set the two passwords
+#   docker compose up -d
+#
+# Calls, group video, recording and transcription all work after this with no
+# System Console visit. Recording spawns a container per job, which is why the
+# job service gets the Docker socket. If you would rather not grant that, drop
+# the calls-offloader service: everything else keeps working and the record
+# button simply does not appear.
+
+# Pinned so the job containers can be told which network to join.
+name: mattermore
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mmuser
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: mattermost
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mmuser -d mattermost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mattermore:
+    image: ghcr.io/dennisklappe/mattermore:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: >-
+        postgres://mmuser:${POSTGRES_PASSWORD}@postgres:5432/mattermost?sslmode=disable&connect_timeout=10
+      MM_SERVICESETTINGS_SITEURL: ${SITE_URL:?set SITE_URL in .env}
+      # Group calls in every channel. Without this the plugin refuses a third
+      # participant, which is the whole reason Mattermore exists.
+      MM_CALLS_GROUP_CALLS_ALLOWED: "true"
+      # Recording and transcription follow this: set it and both turn on.
+      MM_CALLS_JOB_SERVICE_URL: http://calls-offloader:4545
+    volumes:
+      - mattermost-data:/mattermost/data
+      - mattermost-config:/mattermost/config
+      - mattermost-logs:/mattermost/logs
+      - mattermost-plugins:/mattermost/plugins
+      - mattermost-client-plugins:/mattermost/client/plugins
+    ports:
+      - "8065:8065"
+      - "8443:8443/udp"
+
+  # Runs the recorder and transcriber as short-lived containers. Both of those
+  # are Apache 2.0 and this service is AGPL, so nothing here is paywalled.
+  calls-offloader:
+    image: docker.io/mattermost/calls-offloader:latest
+    restart: unless-stopped
+    # It talks to the Docker socket to start jobs, and the image's own user
+    # cannot read it. Mounting that socket already grants root on the host, so
+    # running as root here gives away nothing that the mount did not.
+    user: root
+    environment:
+      # The service sits on the internal compose network, so it can hand out
+      # its own credentials rather than making you generate a pair.
+      API_SECURITY_ALLOWSELFREGISTRATION: "true"
+      # Job containers join this network to reach the server back.
+      DOCKER_NETWORK: mattermore_default
+      # Its working directory is read only, and the console log is the one
+      # docker compose logs shows anyway.
+      LOGGER_ENABLEFILE: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - offloader:/tmp/calls-offloader-db
+
+volumes:
+  postgres:
+  mattermost-data:
+  mattermost-config:
+  mattermost-logs:
+  mattermost-plugins:
+  mattermost-client-plugins:
+  offloader:
