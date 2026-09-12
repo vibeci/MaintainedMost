@@ -1,5 +1,27 @@
+diff --git a/plugin.json b/plugin.json
+index 2dcb572..400d140 100644
+--- a/plugin.json
++++ b/plugin.json
+@@ -82,7 +82,7 @@
+             "key": "EnableVideo",
+             "display_name": "Enable video calls in DMs (Experimental)",
+             "type": "bool",
+-            "default": false,
++            "default": true,
+             "help_text": "When set to true, video calls are enabled in direct message channels."
+           }
+         ]
+@@ -724,7 +724,7 @@
+         "key": "EnableVideo",
+         "display_name": "Enable video calls in DMs (Experimental)",
+         "type": "bool",
+-        "default": false,
++        "default": true,
+         "help_text": "When set to true, video calls are enabled in direct message channels."
+       }
+     ]
 diff --git a/server/configuration.go b/server/configuration.go
-index 3b2c712..1988776 100644
+index 3b2c712..c6f07fc 100644
 --- a/server/configuration.go
 +++ b/server/configuration.go
 @@ -200,8 +200,10 @@ func (c *configuration) SetDefaults() {
@@ -14,15 +36,3 @@ index 3b2c712..1988776 100644
  	}
  	if c.MaxCallParticipants == nil {
  		c.MaxCallParticipants = model.NewPointer(0) // unlimited
-@@ -266,8 +268,10 @@ func (c *configuration) SetDefaults() {
- 	if c.EnableDCSignaling == nil {
- 		c.EnableDCSignaling = model.NewPointer(false)
- 	}
-+	// Group video is the reason most people install Mattermore, and hiding the
-+	// camera button behind a console toggle makes it look missing.
- 	if c.EnableVideo == nil {
--		c.EnableVideo = model.NewPointer(false)
-+		c.EnableVideo = model.NewPointer(true)
- 	}
- }
- 

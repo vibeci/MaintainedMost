@@ -1,5 +1,5 @@
 diff --git a/plugin.json b/plugin.json
-index 2dcb572..9ef7b51 100644
+index 400d140..756ff6d 100644
 --- a/plugin.json
 +++ b/plugin.json
 @@ -229,6 +229,13 @@
@@ -16,8 +16,22 @@ index 2dcb572..9ef7b51 100644
            {
              "key": "JobServiceURL",
              "display_name": "Job service URL",
+@@ -535,6 +542,13 @@
+         "default": false,
+         "help_text": "(Optional) When set to true, call recordings are enabled."
+       },
++      {
++        "key": "RecordCallsByDefault",
++        "display_name": "Record calls automatically",
++        "type": "bool",
++        "default": false,
++        "help_text": "(Optional) When set to true, every call starts recording as soon as it begins, without anyone pressing the button. Participants still see the recording banner. Recording people without telling them is a legal question in many places, so leave this off unless you know where you stand. Requires call recordings to be enabled."
++      },
+       {
+         "key": "JobServiceURL",
+         "display_name": "Job service URL",
 diff --git a/server/configuration.go b/server/configuration.go
-index 46aaf80..bced842 100644
+index 8e4babb..ea0b891 100644
 --- a/server/configuration.go
 +++ b/server/configuration.go
 @@ -118,6 +118,11 @@ type ClientConfig struct {
@@ -32,17 +46,17 @@ index 46aaf80..bced842 100644
  	// When set to true it enables the call transcriptions functionality
  	EnableTranscriptions *bool
  	// When set to true it enables the live captions functionality
-@@ -224,6 +229,9 @@ func (c *configuration) SetDefaults() {
+@@ -220,6 +225,9 @@ func (c *configuration) SetDefaults() {
  	if c.EnableRecordings == nil {
- 		c.EnableRecordings = model.NewPointer(hasJobService)
+ 		c.EnableRecordings = model.NewPointer(false)
  	}
 +	if c.RecordCallsByDefault == nil {
 +		c.RecordCallsByDefault = model.NewPointer(false)
 +	}
  	if c.EnableTranscriptions == nil {
- 		c.EnableTranscriptions = model.NewPointer(hasJobService)
+ 		c.EnableTranscriptions = model.NewPointer(false)
  	}
-@@ -421,6 +429,10 @@ func (c *configuration) Clone() *configuration {
+@@ -432,6 +440,10 @@ func (c *configuration) Clone() *configuration {
  		cfg.EnableRecordings = model.NewPointer(*c.EnableRecordings)
  	}
  
@@ -53,7 +67,7 @@ index 46aaf80..bced842 100644
  	if c.EnableTranscriptions != nil {
  		cfg.EnableTranscriptions = model.NewPointer(*c.EnableTranscriptions)
  	}
-@@ -502,6 +514,11 @@ func (c *configuration) recordingsEnabled() bool {
+@@ -513,6 +525,11 @@ func (c *configuration) recordingsEnabled() bool {
  	return false
  }
  
