@@ -60,7 +60,12 @@ COPY --from=config --chown=2000:2000 --chmod=600 /out.json /mattermost/config/co
 #
 # patches/server/0013 teaches the server to ignore it instead.
 COPY --chown=2000:2000 mattermore-calls.tar.gz /mattermost/prepackaged_plugins/mattermore-calls-linux-amd64.tar.gz
-ENV MM_PREPACKAGED_PLUGINS_SKIP=mattermost-plugin-calls-
+# Playbooks is skipped for a different reason: it ships prepackaged and then
+# refuses to activate, because it wants a Professional licence. It has never
+# worked here, so all it contributes is an error on every start. Lifting it is
+# tracked separately: its own licence checker is Source Available, so it needs
+# the same treatment the calls one got, and a fourth upstream to track.
+ENV MM_PREPACKAGED_PLUGINS_SKIP=mattermost-plugin-calls-,mattermost-plugin-playbooks-
 
 # Group calls are switched on by upstream's own environment variable.
 ENV MM_CALLS_GROUP_CALLS_ALLOWED=true
