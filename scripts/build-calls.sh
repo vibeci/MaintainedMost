@@ -52,9 +52,9 @@ GOOS="$(go env GOHOSTOS)" GOARCH="$(go env GOHOSTARCH)" make -C "$WORK" dist
 # anything set beforehand is discarded. Tagging the checkout does not help
 # either: git picks the upstream tag over ours when both point at HEAD.
 bundles=("$WORK"/dist/*.tar.gz)
-[ "${#bundles[@]}" = "1" ] && [ -f "${bundles[0]}" ] || {
+if [ "${#bundles[@]}" != "1" ] || [ ! -f "${bundles[0]}" ]; then
     echo "build must produce exactly one bundle" >&2; exit 1
-}
+fi
 bundle="${bundles[0]}"
 
 stage="$(mktemp -d "$WORK/bundle.XXXXXX")"
