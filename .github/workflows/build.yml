@@ -38,7 +38,8 @@ jobs:
           export GOTOOLCHAIN="go$GO_VERSION"
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
           MAINTAINEDMOST_IMAGE=maintainedmost:ci CALLS_IMAGE_REGISTRY=maintainedmost SITE_URL=http://localhost POSTGRES_PASSWORD=ci-only docker compose config --quiet
-          export VIBECI_IMAGE="example.invalid/vibeci@sha256:$(printf '0%.0s' {1..64})"
+          VIBECI_IMAGE="example.invalid/vibeci@sha256:$(printf '0%.0s' {1..64})"
+          export VIBECI_IMAGE
           VIBECI_SANDBOX_IMAGE="$VIBECI_IMAGE" VIBECI_RUN_DIR="$RUNNER_TEMP/maintenance-config" docker compose -f maintenance/compose.yaml config --quiet
       - name: Real offloader image and environment contract
         run: ./scripts/test-offloader.sh
