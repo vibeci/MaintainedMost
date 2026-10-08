@@ -1,0 +1,79 @@
+# One-shot CI deployment. Only sandboxd receives the Docker socket; only the
+# harness receives credentials. Neither is mounted into repair/verify workers.
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: "no"
+  logging:
+    driver: none
+
+services:
+  sandboxd:
+    <<: *hardening
+    image: ${VIBECI_IMAGE:?set the digest-pinned VibeCI image}
+    pull_policy: never
+    command: [sandboxd, -config, /etc/vibeci/sandboxd.json]
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - socket:/run/vibeci
+      - ${VIBECI_RUN_DIR:?set the isolated CI runtime directory}/sandboxd.json:/etc/vibeci/sandboxd.json:ro
+
+  vibeci:
+    <<: *hardening
+    image: ${VIBECI_IMAGE:?set the digest-pinned VibeCI image}
+    pull_policy: never
+    user: "10001:10001"
+    command: [run, -config, /etc/vibeci/config.json, -json]
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    secrets: [fork_read_token, llm_api_key]
+    volumes:
+      - ${VIBECI_RUN_DIR:?set the isolated CI runtime directory}/data:/data
+      - socket:/run/vibeci
+      - ${VIBECI_RUN_DIR}/data/config.json:/etc/vibeci/config.json:ro
+
+  probe:
+    <<: *hardening
+    profiles: [tools]
+    image: ${VIBECI_SANDBOX_IMAGE:?set the digest-pinned sandbox image}
+    pull_policy: never
+    user: "10001:10001"
+    network_mode: none
+    entrypoint: [python3]
+    command:
+      - -c
+      - |
+        import http.client, socket, time
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            connection = http.client.HTTPConnection("localhost", timeout=2)
+            connection.sock = socket.socket(socket.AF_UNIX)
+            connection.sock.settimeout(2)
+            try:
+                connection.sock.connect("/run/vibeci/sandboxd.sock")
+                connection.request("GET", "/v1/health")
+                if connection.getresponse().status == 200:
+                    break
+            except (OSError, http.client.HTTPException):
+                pass
+            finally:
+                connection.close()
+            time.sleep(1)
+        else:
+            raise SystemExit("sandbox broker did not become healthy")
+    volumes:
+      - socket:/run/vibeci:ro
+
+# Only the disposable control socket is a volume. Source/state remain in the
+# uniquely named CI directory, not in a shared or production Docker volume.
+volumes:
+  socket: {}
+
+secrets:
+  fork_read_token:
+    file: ${VIBECI_RUN_DIR:?set the isolated CI runtime directory}/secrets/fork_read_token
+  llm_api_key:
+    file: ${VIBECI_RUN_DIR}/secrets/llm_api_key

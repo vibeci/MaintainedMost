@@ -1,20 +1,133 @@
+diff --git a/server/channels/api4/plugin_maintainedmost_test.go b/server/channels/api4/plugin_maintainedmost_test.go
+new file mode 100644
+index 00000000..0135aeb8
+--- /dev/null
++++ b/server/channels/api4/plugin_maintainedmost_test.go
+@@ -0,0 +1,78 @@
++// Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
++// See LICENSE.txt for license information.
++
++package api4
++
++import (
++	"fmt"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++
++	"github.com/mattermost/mattermost/server/public/model"
++	"github.com/mattermost/mattermost/server/public/plugin"
++	"github.com/mattermost/mattermost/server/public/shared/request"
++	"github.com/mattermost/mattermost/server/v8/channels/store/storetest/mocks"
++	"github.com/mattermost/mattermost/server/v8/channels/testlib"
++)
++
++func TestMaintainedMostPluginInstallGuards(t *testing.T) {
++	st := testlib.GetMockStoreForSetupFunctions()
++	th := setupTestHelper(t, st, nil, nil, false, false, func(cfg *model.Config) {
++		*cfg.CacheSettings.CacheType = model.CacheTypeLRU
++		*cfg.PluginSettings.Enable = true
++		*cfg.PluginSettings.EnableUploads = true
++		*cfg.PluginSettings.EnableMarketplace = true
++		*cfg.PluginSettings.EnableRemoteMarketplace = false
++		*cfg.PluginSettings.RequirePluginSignature = true
++	}, nil)
++	th.App.GetPluginsEnvironment().SetPrepackagedPlugins([]*plugin.PrepackagedPlugin{{
++		Manifest: &model.Manifest{Id: "testplugin", Version: "0.0.1"},
++	}}, nil)
++
++	for _, tc := range []struct {
++		name    string
++		handler func(*Context, http.ResponseWriter, *http.Request)
++		errorID string
++	}{
++		{"upload", uploadPlugin, "app.plugin.upload_disabled.app_error"},
++		{"URL", installPluginFromURL, "app.plugin.disabled.app_error"},
++	} {
++		t.Run("signature required/"+tc.name, func(t *testing.T) {
++			c := &Context{App: th.App, AppContext: request.TestContext(t).WithSession(&model.Session{Roles: model.SystemAdminRoleId}), Logger: th.TestLogger}
++			tc.handler(c, httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/v4/plugins", nil))
++			require.NotNil(t, c.Err)
++			require.Equal(t, tc.errorID, c.Err.Id)
++			require.Equal(t, http.StatusNotImplemented, c.Err.StatusCode)
++		})
++	}
++
++	roles := st.Role().(*mocks.RoleStore)
++	roles.On("GetByNames", []string{model.SystemUserRoleId}).Return([]*model.Role{{Name: model.SystemUserRoleId}}, nil)
++	for _, required := range []bool{true, false} {
++		th.App.UpdateConfig(func(cfg *model.Config) { *cfg.PluginSettings.RequirePluginSignature = required })
++		for _, tc := range []struct {
++			name    string
++			handler func(*Context, http.ResponseWriter, *http.Request)
++		}{
++			{"upload", uploadPlugin},
++			{"URL", installPluginFromURL},
++			{"marketplace", installMarketplacePlugin},
++		} {
++			if required && tc.name != "marketplace" {
++				continue // These are rejected by the signature policy before authorization.
++			}
++			t.Run(fmt.Sprintf("permission required/signatures=%t/%s", required, tc.name), func(t *testing.T) {
++				c := &Context{App: th.App, AppContext: request.TestContext(t).WithSession(&model.Session{UserId: model.NewId(), Roles: model.SystemUserRoleId}), Logger: th.TestLogger}
++				tc.handler(c, httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/v4/plugins", strings.NewReader(`{"id":"testplugin"}`)))
++				require.NotNil(t, c.Err)
++				require.Equal(t, "api.context.permissions.app_error", c.Err.Id)
++				require.Equal(t, http.StatusForbidden, c.Err.StatusCode)
++			})
++		}
++	}
++	roles.AssertExpectations(t)
++}
 diff --git a/server/channels/app/plugin.go b/server/channels/app/plugin.go
-index 2bda094d..02560a5b 100644
+index 0e2b950e..f5cc22cf 100644
 --- a/server/channels/app/plugin.go
 +++ b/server/channels/app/plugin.go
-@@ -1192,24 +1192,32 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
+@@ -1159,16 +1159,24 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
+ 			}
+ 			defer bundleReader.Close()
+ 
+-			signatureReader, err := os.Open(p.SignaturePath)
+-			if err != nil {
+-				logger.Error("Failed to read transitionally prepackaged plugin signature", mlog.Err(err))
+-				return
++			var signature io.ReadSeeker
++			if p.SignaturePath != "" {
++				signatureReader, err := os.Open(p.SignaturePath)
++				if err != nil {
++					logger.Error("Failed to read transitionally prepackaged plugin signature", mlog.Err(err))
++					return
++				}
++				defer signatureReader.Close()
++				if appErr := ch.verifyPlugin(logger, bundleReader, signatureReader); appErr != nil {
++					logger.Error("Failed to verify transitionally prepackaged plugin signature", mlog.Err(appErr))
++					return
++				}
++				signature = signatureReader
+ 			}
+-			defer signatureReader.Close()
+ 
+-			// Write the plugin to the filestore, but don't bother notifying the peers,
+-			// as there's no reason to reload the plugin to run the same version again.
+-			appErr := ch.installPluginToFilestore(p.Manifest, bundleReader, signatureReader)
++			// Local image trust does not follow the copy: filestore and cluster readers
++			// still enforce RequirePluginSignature independently.
++			appErr := ch.installPluginToFilestore(p.Manifest, bundleReader, signature)
+ 			if appErr != nil {
+ 				logger.Error("Failed to persist transitionally prepackaged plugin", mlog.Err(appErr))
+ 			}
+@@ -1182,24 +1190,25 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
  
  // buildPrepackagedPlugin builds a PrepackagedPlugin from the plugin at the given path, additionally returning the directory in which it was extracted.
  func (ch *Channels) buildPrepackagedPlugin(logger *mlog.Logger, pluginPath *pluginSignaturePath, pluginFile io.ReadSeeker, tmpDir string) (*plugin.PrepackagedPlugin, string, error) {
 -	// Always require signature for prepackaged plugins
-+	// Mattermore: upstream rejects any prepackaged plugin without a signature
-+	// made with Mattermost's own key, which no third party can produce.
-+	//
-+	// Prepackaged plugins are not uploaded by an administrator; they ship in the
-+	// same image as the server binary and are exactly as trusted as it is.
-+	// RequirePluginSignature guards uploads, which is a genuinely different
-+	// trust boundary and is left alone. A signature that is present is still
-+	// verified exactly as before.
++	// MaintainedMost trusts unsigned bundles shipped locally alongside the server binary.
++	// This exception is not for uploads, downloads, or filestore/cluster installs.
++	// Present signatures must still verify with an upstream or admin-configured key
++	// (SignaturePublicKeyFiles), regardless of RequirePluginSignature.
  	if pluginPath.signaturePath == "" {
 -		return nil, "", errors.Errorf("Prepackaged plugin missing required signature file")
 -	}
@@ -25,10 +138,8 @@ index 2bda094d..02560a5b 100644
 -		return nil, "", errors.Wrapf(sigErr, "Failed to open prepackaged plugin signature %s", pluginPath.signaturePath)
 -	}
 -	defer signatureFile.Close()
-+		logger.Warn("Prepackaged plugin has no signature file, installing it on the trust of the image it ships in",
-+			mlog.String("bundle_path", pluginPath.bundlePath))
++		logger.Warn("Prepackaged plugin has no signature file, trusting the local server image", mlog.String("bundle_path", pluginPath.bundlePath))
 +	} else {
-+		// Open signature file
 +		signatureFile, sigErr := os.Open(pluginPath.signaturePath)
 +		if sigErr != nil {
 +			return nil, "", errors.Wrapf(sigErr, "Failed to open prepackaged plugin signature %s", pluginPath.signaturePath)
@@ -41,7 +152,6 @@ index 2bda094d..02560a5b 100644
 -	}
 -	if appErr := ch.verifyPlugin(logger, pluginFile, signatureFile); appErr != nil {
 -		return nil, "", errors.Wrapf(appErr, "Prepackaged plugin signature verification failed for %s using %s", pluginPath.bundlePath, pluginPath.signaturePath)
-+		// Verify signature extraction
 +		if _, err := pluginFile.Seek(0, io.SeekStart); err != nil {
 +			return nil, "", errors.Wrapf(err, "Failed to seek to start of plugin file for signature verification: %s", pluginPath.bundlePath)
 +		}
@@ -51,3 +161,512 @@ index 2bda094d..02560a5b 100644
  	}
  
  	// Extract plugin after signature verification
+diff --git a/server/channels/app/plugin_install.go b/server/channels/app/plugin_install.go
+index 32fc6065..69344685 100644
+--- a/server/channels/app/plugin_install.go
++++ b/server/channels/app/plugin_install.go
+@@ -132,7 +132,7 @@ func (ch *Channels) installPluginFromClusterMessage(pluginID string) {
+ 		defer signature.Close()
+ 
+ 		if err := ch.verifyPlugin(logger, bundle, signature); err != nil {
+-			logger.Error("Failed to validate plugin signature.", mlog.Err(appErr))
++			logger.Error("Failed to validate plugin signature.", mlog.Err(err))
+ 			return
+ 		}
+ 	}
+@@ -263,6 +263,7 @@ func (ch *Channels) InstallMarketplacePlugin(request *model.InstallMarketplacePl
+ 	logger.Info("Installing plugin from marketplace")
+ 
+ 	var pluginFile, signatureFile io.ReadSeeker
++	fromPrepackaged := false
+ 
+ 	prepackagedPlugin, appErr := ch.getPrepackagedPlugin(request.Id, request.Version)
+ 	if appErr != nil && appErr.Id != "app.plugin.marketplace_plugins.not_found.app_error" {
+@@ -275,14 +276,17 @@ func (ch *Channels) InstallMarketplacePlugin(request *model.InstallMarketplacePl
+ 		}
+ 		defer fileReader.Close()
+ 
+-		signatureReader, err := os.Open(prepackagedPlugin.SignaturePath)
+-		if err != nil {
+-			return nil, model.NewAppError("InstallMarketplacePlugin", "app.plugin.install_marketplace_plugin.app_error", nil, fmt.Sprintf("failed to open prepackaged plugin signature %s", prepackagedPlugin.SignaturePath), http.StatusInternalServerError).Wrap(err)
++		if prepackagedPlugin.SignaturePath != "" {
++			signatureReader, err := os.Open(prepackagedPlugin.SignaturePath)
++			if err != nil {
++				return nil, model.NewAppError("InstallMarketplacePlugin", "app.plugin.install_marketplace_plugin.app_error", nil, fmt.Sprintf("failed to open prepackaged plugin signature %s", prepackagedPlugin.SignaturePath), http.StatusInternalServerError).Wrap(err)
++			}
++			defer signatureReader.Close()
++			signatureFile = signatureReader
+ 		}
+-		defer signatureReader.Close()
+ 
+ 		pluginFile = fileReader
+-		signatureFile = signatureReader
++		fromPrepackaged = true
+ 		logger.Debug("Found matching pre-packaged plugin", mlog.String("bundle_path", prepackagedPlugin.Path), mlog.String("signature_path", prepackagedPlugin.SignaturePath))
+ 	}
+ 
+@@ -322,6 +326,7 @@ func (ch *Channels) InstallMarketplacePlugin(request *model.InstallMarketplacePl
+ 				}
+ 				pluginFile = bytes.NewReader(downloadedPluginBytes)
+ 				signatureFile = signature
++				fromPrepackaged = false
+ 			} else {
+ 				logger.Debug("Preferring pre-packaged plugin over version in remote marketplace", mlog.String("version", plugin.Manifest.Version), mlog.String("download_url", plugin.DownloadURL))
+ 			}
+@@ -332,11 +337,13 @@ func (ch *Channels) InstallMarketplacePlugin(request *model.InstallMarketplacePl
+ 		return nil, model.NewAppError("InstallMarketplacePlugin", "app.plugin.marketplace_plugins.not_found.app_error", nil, "", http.StatusInternalServerError)
+ 	}
+ 	if signatureFile == nil {
+-		return nil, model.NewAppError("InstallMarketplacePlugin", "app.plugin.marketplace_plugins.signature_not_found.app_error", nil, "", http.StatusInternalServerError)
+-	}
+-
+-	appErr = ch.verifyPlugin(logger, pluginFile, signatureFile)
+-	if appErr != nil {
++		// Trust only the selected local image bundle, never a remote replacement
++		// sharing its plugin ID. External signature policy remains unchanged.
++		if !fromPrepackaged {
++			return nil, model.NewAppError("InstallMarketplacePlugin", "app.plugin.marketplace_plugins.signature_not_found.app_error", nil, "", http.StatusInternalServerError)
++		}
++		logger.Warn("Prepackaged plugin has no signature file, trusting the local server image", mlog.String("bundle_path", prepackagedPlugin.Path))
++	} else if appErr = ch.verifyPlugin(logger, pluginFile, signatureFile); appErr != nil {
+ 		return nil, appErr
+ 	}
+ 
+diff --git a/server/channels/app/plugin_maintainedmost_test.go b/server/channels/app/plugin_maintainedmost_test.go
+new file mode 100644
+index 00000000..17d4d989
+--- /dev/null
++++ b/server/channels/app/plugin_maintainedmost_test.go
+@@ -0,0 +1,402 @@
++// Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
++// See LICENSE.txt for license information.
++
++package app
++
++import (
++	"bytes"
++	"encoding/base64"
++	"encoding/json"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"path/filepath"
++	"sync/atomic"
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++
++	"github.com/mattermost/mattermost/server/public/model"
++	"github.com/mattermost/mattermost/server/public/plugin"
++	"github.com/mattermost/mattermost/server/public/shared/httpservice"
++	"github.com/mattermost/mattermost/server/public/shared/mlog"
++	"github.com/mattermost/mattermost/server/v8/channels/app/platform"
++	storemocks "github.com/mattermost/mattermost/server/v8/channels/store/storetest/mocks"
++	"github.com/mattermost/mattermost/server/v8/channels/utils/fileutils"
++	"github.com/mattermost/mattermost/server/v8/config"
++	"github.com/mattermost/mattermost/server/v8/platform/shared/filestore"
++)
++
++// Exercise the real install, extraction, signature and persistence paths without
++// a database or plugin subprocess. The only signing key is upstream's test key.
++func maintainedmostPluginChannels(t *testing.T, requireSignature bool) (*Channels, string) {
++	t.Helper()
++	testsPath, found := fileutils.FindDir("tests")
++	require.True(t, found)
++	publicKey, err := os.ReadFile(filepath.Join(testsPath, "development-public-key.asc"))
++	require.NoError(t, err)
++	cs := config.NewTestMemoryStore()
++	t.Cleanup(func() { require.NoError(t, cs.Close()) })
++	cfg := cs.Get().Clone()
++	*cfg.PluginSettings.Enable = true
++	*cfg.PluginSettings.EnableRemoteMarketplace = false
++	*cfg.PluginSettings.AutomaticPrepackagedPlugins = false
++	*cfg.PluginSettings.RequirePluginSignature = requireSignature
++	*cfg.PluginSettings.Directory = t.TempDir()
++	*cfg.PluginSettings.ClientDirectory = t.TempDir()
++	*cfg.FileSettings.Directory = t.TempDir()
++	*cfg.ServiceSettings.AllowedUntrustedInternalConnections = "127.0.0.1"
++	cfg.PluginSettings.SignaturePublicKeyFiles = []string{"development-public-key.asc"}
++	require.NoError(t, cs.SetFile("development-public-key.asc", publicKey))
++	_, _, err = cs.Set(cfg)
++	require.NoError(t, err)
++
++	ps := &platform.PlatformService{Store: &storemocks.Store{}}
++	logger := mlog.CreateConsoleTestLogger(t)
++	ps.SetLogger(logger)
++	require.NoError(t, platform.ConfigStore(cs)(ps))
++	backend, err := filestore.NewFileBackend(filestore.FileBackendSettings{
++		DriverName: model.ImageDriverLocal,
++		Directory:  *cfg.FileSettings.Directory,
++	})
++	require.NoError(t, err)
++	require.NoError(t, platform.SetFileStore(backend)(ps))
++	env, err := plugin.NewEnvironment(nil, nil, *cfg.PluginSettings.Directory, *cfg.PluginSettings.ClientDirectory, logger, nil)
++	require.NoError(t, err)
++	t.Cleanup(env.Shutdown)
++	srv := &Server{platform: ps, httpService: httpservice.MakeHTTPService(ps)}
++	return &Channels{srv: srv, cfgSvc: ps, pluginsEnvironment: env}, testsPath
++}
++
++func maintainedmostPluginPath(t *testing.T, testsPath, signature string) *pluginSignaturePath {
++	t.Helper()
++	p := &pluginSignaturePath{pluginID: "testplugin", bundlePath: filepath.Join(testsPath, "testplugin.tar.gz")}
++	switch signature {
++	case "unsigned":
++	case "valid":
++		p.signaturePath = p.bundlePath + ".sig"
++	case "invalid":
++		p.signaturePath = filepath.Join(testsPath, "testplugin2.tar.gz.sig")
++	case "empty", "missing":
++		p.signaturePath = filepath.Join(t.TempDir(), "testplugin.tar.gz.sig")
++		if signature == "empty" {
++			require.NoError(t, os.WriteFile(p.signaturePath, nil, 0600))
++		}
++	default:
++		t.Fatalf("unknown signature fixture %q", signature)
++	}
++	return p
++}
++
++func TestMaintainedMostPrepackagedSignatures(t *testing.T) {
++	for _, required := range []bool{false, true} {
++		for _, signature := range []string{"unsigned", "valid", "invalid", "empty", "missing"} {
++			t.Run(fmt.Sprintf("required=%t/%s", required, signature), func(t *testing.T) {
++				ch, testsPath := maintainedmostPluginChannels(t, required)
++				path := maintainedmostPluginPath(t, testsPath, signature)
++				p, err := ch.processPrepackagedPlugin(path)
++				if signature != "unsigned" && signature != "valid" {
++					require.Error(t, err)
++					require.Nil(t, p)
++					if signature == "missing" {
++						require.ErrorIs(t, err, os.ErrNotExist)
++					} else {
++						require.Contains(t, err.Error(), "signature verification failed")
++					}
++					return
++				}
++				require.NoError(t, err)
++				require.Equal(t, "testplugin", p.Manifest.Id)
++				require.Equal(t, path.bundlePath, p.Path)
++				require.Equal(t, path.signaturePath, p.SignaturePath)
++				require.NotEmpty(t, p.IconData)
++				require.Equal(t, required, *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature)
++			})
++		}
++	}
++}
++
++func TestMaintainedMostUnsignedPrepackagedStartup(t *testing.T) {
++	for _, tc := range []struct {
++		name      string
++		automatic bool
++		enabled   bool
++	}{
++		{"enabled", true, true},
++		{"not enabled", true, false},
++		{"automatic install disabled", false, true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ch, _ := maintainedmostPluginChannels(t, true)
++			const id = "com.maintainedmost.trusted"
++			ch.cfgSvc.UpdateConfig(func(cfg *model.Config) {
++				*cfg.PluginSettings.AutomaticPrepackagedPlugins = tc.automatic
++				cfg.PluginSettings.PluginStates[id] = &model.PluginState{Enable: tc.enabled}
++			})
++			bundle := makeInMemoryGzipTarFile(t, []testFile{
++				{"plugin.json", `{"id":"com.maintainedmost.trusted","version":"1.0.0","webapp":{"bundle_path":"main.js"}}`},
++				{"main.js", "// local image fixture"},
++			})
++			data, err := io.ReadAll(bundle)
++			require.NoError(t, err)
++			dir := t.TempDir()
++			require.NoError(t, os.WriteFile(filepath.Join(dir, id+".tar.gz"), data, 0600))
++			require.NoError(t, ch.processPrepackagedPlugins(dir))
++			require.Len(t, ch.pluginsEnvironment.PrepackagedPlugins(), 1)
++			available, err := ch.pluginsEnvironment.Available()
++			require.NoError(t, err)
++			if tc.automatic && tc.enabled {
++				require.Len(t, available, 1)
++				require.Equal(t, id, available[0].Manifest.Id)
++				require.True(t, ch.pluginsEnvironment.IsActive(id))
++				for range 2 {
++					manifest, appErr := ch.InstallMarketplacePlugin(&model.InstallMarketplacePluginRequest{Id: id, Version: "1.0.0"})
++					require.Nil(t, appErr)
++					require.Equal(t, id, manifest.Id)
++					require.True(t, ch.pluginsEnvironment.IsActive(id), "reinstall must reactivate the enabled plugin")
++				}
++			} else {
++				require.Empty(t, available)
++			}
++		})
++	}
++}
++
++func TestMaintainedMostMarketplacePrepackagedInstall(t *testing.T) {
++	for _, required := range []bool{false, true} {
++		for _, signature := range []string{"unsigned", "valid", "invalid", "empty", "missing"} {
++			t.Run(fmt.Sprintf("required=%t/%s", required, signature), func(t *testing.T) {
++				ch, testsPath := maintainedmostPluginChannels(t, required)
++				path := maintainedmostPluginPath(t, testsPath, signature)
++				p := &plugin.PrepackagedPlugin{
++					Manifest:      &model.Manifest{Id: "testplugin", Version: "0.0.1"},
++					Path:          path.bundlePath,
++					SignaturePath: path.signaturePath,
++				}
++				ch.pluginsEnvironment.SetPrepackagedPlugins([]*plugin.PrepackagedPlugin{p}, nil)
++				for range 2 { // Both installation and replacement must reach the real install path.
++					manifest, appErr := ch.InstallMarketplacePlugin(&model.InstallMarketplacePluginRequest{Id: p.Manifest.Id, Version: p.Manifest.Version})
++					if signature != "unsigned" && signature != "valid" {
++						require.NotNil(t, appErr)
++						require.Nil(t, manifest)
++						if signature == "missing" {
++							require.ErrorIs(t, appErr, os.ErrNotExist)
++						} else {
++							require.Equal(t, "api.plugin.verify_plugin.app_error", appErr.Id)
++						}
++						available, err := ch.pluginsEnvironment.Available()
++						require.NoError(t, err)
++						require.Empty(t, available)
++						require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getBundleStorePath(p.Manifest.Id)))
++						return
++					}
++					require.Nil(t, appErr)
++					require.Equal(t, p.Manifest.Id, manifest.Id)
++					require.Equal(t, p.Manifest.Version, manifest.Version)
++					installed, err := ch.pluginsEnvironment.GetManifest(manifest.Id)
++					require.NoError(t, err)
++					require.Equal(t, manifest.Version, installed.Version)
++					bundleBytes, err := os.ReadFile(p.Path)
++					require.NoError(t, err)
++					stored, err := ch.srv.FileBackend().ReadFile(getBundleStorePath(manifest.Id))
++					require.NoError(t, err)
++					require.Equal(t, bundleBytes, stored)
++					if signature == "valid" {
++						signatureBytes, err := os.ReadFile(p.SignaturePath)
++						require.NoError(t, err)
++						storedSignature, err := ch.srv.FileBackend().ReadFile(getSignatureStorePath(manifest.Id))
++						require.NoError(t, err)
++						require.Equal(t, signatureBytes, storedSignature)
++					} else {
++						require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getSignatureStorePath(manifest.Id)))
++					}
++				}
++				for _, request := range []*model.InstallMarketplacePluginRequest{
++					{Id: "other-plugin", Version: "0.0.1"},
++					{Id: p.Manifest.Id, Version: "0.0.2"},
++				} {
++					manifest, appErr := ch.InstallMarketplacePlugin(request)
++					require.Nil(t, manifest)
++					require.NotNil(t, appErr)
++					require.Equal(t, "app.plugin.marketplace_plugins.not_found.app_error", appErr.Id)
++				}
++				require.Equal(t, required, *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature)
++			})
++		}
++	}
++}
++
++func TestMaintainedMostMarketplaceRemoteSignatures(t *testing.T) {
++	for _, required := range []bool{false, true} {
++		for _, source := range []string{"remote only", "upgrade from unsigned local", "requested version not local", "same version prefers local"} {
++			for _, signature := range []string{"unsigned", "valid", "invalid", "bad base64"} {
++				t.Run(fmt.Sprintf("required=%t/%s/%s", required, source, signature), func(t *testing.T) {
++					ch, testsPath := maintainedmostPluginChannels(t, required)
++					bundleBytes, err := os.ReadFile(filepath.Join(testsPath, "testplugin-v0.0.2.tar.gz"))
++					require.NoError(t, err)
++					var encodedSignature string
++					if signature == "valid" || signature == "invalid" {
++						filename := "testplugin-v0.0.2.tar.gz.sig"
++						if signature == "invalid" {
++							filename = "testplugin2.tar.gz.sig"
++						}
++						data, err := os.ReadFile(filepath.Join(testsPath, filename))
++						require.NoError(t, err)
++						encodedSignature = base64.StdEncoding.EncodeToString(data)
++					} else if signature == "bad base64" {
++						encodedSignature = "!not-base64"
++					}
++					var downloads atomic.Int32
++					marketplace := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++						switch r.URL.Path {
++						case "/api/v1/plugins":
++							assert.Equal(t, "testplugin", r.URL.Query().Get("plugin_id"))
++							assert.NoError(t, json.NewEncoder(w).Encode([]*model.BaseMarketplacePlugin{{
++								Manifest:    &model.Manifest{Id: "testplugin", Version: "0.0.2"},
++								DownloadURL: "http://" + r.Host + "/bundle",
++								Signature:   encodedSignature,
++							}}))
++						case "/bundle":
++							downloads.Add(1)
++							_, err := w.Write(bundleBytes)
++							assert.NoError(t, err)
++						default:
++							t.Errorf("unexpected marketplace request: %s", r.URL.Path)
++							w.WriteHeader(http.StatusNotFound)
++						}
++					}))
++					defer marketplace.Close()
++					ch.cfgSvc.UpdateConfig(func(cfg *model.Config) {
++						*cfg.PluginSettings.EnableRemoteMarketplace = true
++						*cfg.PluginSettings.MarketplaceURL = marketplace.URL
++						*cfg.PluginSettings.AllowInsecureDownloadURL = true // Loopback httptest server only.
++					})
++					if source != "remote only" {
++						path := maintainedmostPluginPath(t, testsPath, "unsigned")
++						if source == "same version prefers local" {
++							path.bundlePath = filepath.Join(testsPath, "testplugin-v0.0.2.tar.gz")
++						}
++						p, err := ch.processPrepackagedPlugin(path)
++						require.NoError(t, err)
++						ch.pluginsEnvironment.SetPrepackagedPlugins([]*plugin.PrepackagedPlugin{p}, nil)
++					}
++					request := &model.InstallMarketplacePluginRequest{Id: "testplugin"}
++					if source == "requested version not local" {
++						request.Version = "0.0.2"
++					}
++					manifest, appErr := ch.InstallMarketplacePlugin(request)
++					local := source == "same version prefers local"
++					if local {
++						require.Zero(t, downloads.Load())
++					} else {
++						require.EqualValues(t, 1, downloads.Load())
++					}
++					if signature == "valid" || local {
++						require.Nil(t, appErr)
++						require.Equal(t, "0.0.2", manifest.Version)
++						installed, err := ch.pluginsEnvironment.GetManifest(manifest.Id)
++						require.NoError(t, err)
++						require.Equal(t, manifest.Version, installed.Version)
++						stored, err := ch.srv.FileBackend().ReadFile(getBundleStorePath(manifest.Id))
++						require.NoError(t, err)
++						require.Equal(t, bundleBytes, stored)
++					} else {
++						require.Nil(t, manifest)
++						require.NotNil(t, appErr)
++						if signature == "bad base64" {
++							require.Equal(t, "app.plugin.signature_decode.app_error", appErr.Id)
++						} else {
++							require.Equal(t, "api.plugin.verify_plugin.app_error", appErr.Id)
++						}
++						available, err := ch.pluginsEnvironment.Available()
++						require.NoError(t, err)
++						require.Empty(t, available)
++						require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getBundleStorePath(request.Id)))
++					}
++					require.Equal(t, required, *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature)
++				})
++			}
++		}
++	}
++}
++
++func TestMaintainedMostTransitionalPrepackagedPersistence(t *testing.T) {
++	for _, required := range []bool{false, true} {
++		for _, signature := range []string{"unsigned", "valid", "invalid", "empty", "missing"} {
++			t.Run(fmt.Sprintf("required=%t/%s", required, signature), func(t *testing.T) {
++				ch, testsPath := maintainedmostPluginChannels(t, required)
++				path := maintainedmostPluginPath(t, testsPath, signature)
++				p := &plugin.PrepackagedPlugin{
++					Manifest:      &model.Manifest{Id: "testplugin", Version: "0.0.1"},
++					Path:          path.bundlePath,
++					SignaturePath: path.signaturePath,
++				}
++				ch.pluginsEnvironment.SetPrepackagedPlugins(nil, []*plugin.PrepackagedPlugin{p})
++				ch.persistTransitionallyPrepackagedPlugins()
++				require.Empty(t, ch.pluginsEnvironment.TransitionallyPrepackagedPlugins())
++				if signature != "unsigned" && signature != "valid" {
++					require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getBundleStorePath(p.Manifest.Id)))
++					require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getSignatureStorePath(p.Manifest.Id)))
++					return
++				}
++				expectedBundle, err := os.ReadFile(p.Path)
++				require.NoError(t, err)
++				stored, err := ch.srv.FileBackend().ReadFile(getBundleStorePath(p.Manifest.Id))
++				require.NoError(t, err)
++				require.Equal(t, expectedBundle, stored)
++				if signature == "valid" {
++					expectedSignature, err := os.ReadFile(p.SignaturePath)
++					require.NoError(t, err)
++					storedSignature, err := ch.srv.FileBackend().ReadFile(getSignatureStorePath(p.Manifest.Id))
++					require.NoError(t, err)
++					require.Equal(t, expectedSignature, storedSignature)
++					require.Nil(t, ch.verifyPlugin(ch.srv.Log(), bytes.NewReader(stored), bytes.NewReader(storedSignature)))
++				} else {
++					require.NoFileExists(t, filepath.Join(*ch.cfgSvc.Config().FileSettings.Directory, getSignatureStorePath(p.Manifest.Id)))
++				}
++			})
++		}
++	}
++}
++
++func TestMaintainedMostFilestoreSignatureEnforcement(t *testing.T) {
++	for _, source := range []string{"sync", "cluster"} {
++		for _, signature := range []string{"unsigned", "valid", "invalid", "empty"} {
++			t.Run(source+"/"+signature, func(t *testing.T) {
++				ch, testsPath := maintainedmostPluginChannels(t, true)
++				path := maintainedmostPluginPath(t, testsPath, signature)
++				data, err := os.ReadFile(path.bundlePath)
++				require.NoError(t, err)
++				_, err = ch.srv.FileBackend().WriteFile(bytes.NewReader(data), getBundleStorePath(path.pluginID))
++				require.NoError(t, err)
++				if signature != "unsigned" {
++					data, err = os.ReadFile(path.signaturePath)
++					require.NoError(t, err)
++					_, err = ch.srv.FileBackend().WriteFile(bytes.NewReader(data), getSignatureStorePath(path.pluginID))
++					require.NoError(t, err)
++				}
++				// Even a known, trusted local bundle must not exempt a filestore copy.
++				p, err := ch.processPrepackagedPlugin(maintainedmostPluginPath(t, testsPath, "unsigned"))
++				require.NoError(t, err)
++				ch.pluginsEnvironment.SetPrepackagedPlugins([]*plugin.PrepackagedPlugin{p}, nil)
++				if source == "sync" {
++					require.Nil(t, ch.syncPlugins())
++				} else {
++					ch.installPluginFromClusterMessage(path.pluginID)
++				}
++				available, err := ch.pluginsEnvironment.Available()
++				require.NoError(t, err)
++				if signature == "valid" {
++					require.Len(t, available, 1)
++					require.Equal(t, path.pluginID, available[0].Manifest.Id)
++				} else {
++					require.Empty(t, available)
++				}
++				require.True(t, *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature)
++			})
++		}
++	}
++}
+diff --git a/server/channels/app/plugin_prepackaged_test.go b/server/channels/app/plugin_prepackaged_test.go
+index d5ce7725..d8f81749 100644
+--- a/server/channels/app/plugin_prepackaged_test.go
++++ b/server/channels/app/plugin_prepackaged_test.go
+@@ -65,7 +65,7 @@ func TestBuildPrepackagedPlugin(t *testing.T) {
+ 		assert.NotEmpty(t, plugin.IconData, "Plugin should have icon data loaded")
+ 	})
+ 
+-	t.Run("missing signature file", func(t *testing.T) {
++	t.Run("unsigned local image bundle", func(t *testing.T) {
+ 		th := Setup(t)
+ 
+ 		// Create plugin path with empty signature path
+@@ -82,11 +82,11 @@ func TestBuildPrepackagedPlugin(t *testing.T) {
+ 		logger := mlog.CreateConsoleTestLogger(t)
+ 
+ 		plugin, pluginDir, err := th.App.ch.buildPrepackagedPlugin(logger, pluginPath, pluginFile, t.TempDir())
+-		require.Error(t, err)
+-		require.Nil(t, plugin)
+-		require.Empty(t, pluginDir)
+-
+-		assert.Contains(t, err.Error(), "Prepackaged plugin missing required signature file")
++		require.NoError(t, err)
++		require.NotNil(t, plugin)
++		require.NotEmpty(t, pluginDir)
++		assert.Equal(t, "testplugin", plugin.Manifest.Id)
++		assert.Empty(t, plugin.SignaturePath)
+ 	})
+ 
+ 	t.Run("nonexistent signature file", func(t *testing.T) {

@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
 #
-# Builds the Mattermore server binary.
+# Builds the MaintainedMost server binary.
 #
 # Usage: ./scripts/build-server.sh [output-path]
-# Requires: git, go, node, npm.
+# Requires: git, go, Node 24 and upstream's npm (package-lock.json is authoritative).
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$(readlink -f "${1:-$ROOT/dist/mattermore-server}")"
+source "$ROOT/scripts/lib.sh"
+OUT="${1:-$ROOT/dist/maintainedmost-server}"
+OUT="$(absolute_dir "$(dirname "$OUT")")/$(basename "$OUT")"
 WORK="$ROOT/build/server"
 
 # shellcheck source=../upstream.env
 source "$ROOT/upstream.env"
+export GOTOOLCHAIN="go$GO_VERSION"
 
-echo "==> upstream $SERVER_TAG"
-rm -rf "$WORK"; mkdir -p "$(dirname "$WORK")" "$(dirname "$OUT")"
-git clone --quiet --depth 1 --branch "$SERVER_TAG" \
-    https://github.com/mattermost/mattermost.git "$WORK"
-
-for patch in "$ROOT"/patches/server/*.patch; do
-    echo "    $(basename "$patch")"
-    git -C "$WORK" apply "$patch"
-done
+prepare_source https://github.com/mattermost/mattermost.git \
+    "$SERVER_TAG" server "$SERVER_COMMIT"
 
 # The marks are images, not code, so they are copied rather than patched. They
 # are committed already rendered, so this needs no image tooling.
@@ -33,7 +29,12 @@ done
 # published version, which lags the tree and fails to compile.
 ( cd "$WORK/server" && go work init . ./public )
 
-( cd "$WORK/server" && go build -o "$OUT" ./cmd/mattermost )
+if [ "${RUN_TESTS:-0}" = "1" ]; then
+    "$ROOT/scripts/test-component.sh" server "$WORK"
+fi
+
+# Native by default; build-image.sh supplies Linux/amd64 with CGO disabled.
+( cd "$WORK/server" && go build -trimpath -tags production -o "$OUT" ./cmd/mattermost )
 
 # Two patches change only the web app, and the official image ships a prebuilt
 # one. Without this step those patches are inert: the guest administration
@@ -42,9 +43,17 @@ if [ "${SKIP_WEBAPP:-}" != "1" ]; then
     echo "==> building the web app"
     ( cd "$WORK/webapp" && npm ci --no-audit --no-fund )
     ( cd "$WORK/webapp" && NODE_OPTIONS=--max-old-space-size=6144 npm run build )
-    rm -rf "$(dirname "$OUT")/client"
-    cp -r "$WORK/webapp/channels/dist" "$(dirname "$OUT")/client"
-    echo "==> $(dirname "$OUT")/client"
+    client="$(dirname "$OUT")/client"
+    if [ -e "$client" ] || [ -L "$client" ]; then
+        if [ -L "$client" ] || [ ! -f "$client/.maintainedmost-generated" ]; then
+            echo "refusing to replace non-generated webapp directory: $client" >&2
+            exit 1
+        fi
+        rm -rf "$client"
+    fi
+    cp -R "$WORK/webapp/channels/dist" "$client"
+    touch "$client/.maintainedmost-generated"
+    echo "==> $client"
 fi
 
 echo "==> $OUT"

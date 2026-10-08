@@ -1,8 +1,8 @@
 diff --git a/server/configuration.go b/server/configuration.go
-index c6f07fc..ee98b97 100644
+index c6f07fc..bfe7285 100644
 --- a/server/configuration.go
 +++ b/server/configuration.go
-@@ -687,11 +687,47 @@ func (p *Plugin) ConfigurationWillBeSaved(newCfg *model.Config) (*model.Config,
+@@ -687,11 +687,42 @@ func (p *Plugin) ConfigurationWillBeSaved(newCfg *model.Config) (*model.Config,
  	return nil, nil
  }
  
@@ -30,19 +30,14 @@ index c6f07fc..ee98b97 100644
  
  	cfg.AllowEnableCalls = model.NewPointer(true)
  
-+	// Recording and transcription need a job service to run them, and that is
-+	// the only reason they were ever a decision. So they follow it: configure
-+	// one and both are on.
-+	//
-+	// This cannot live in SetDefaults. plugin.json declares both keys with a
-+	// default of false, so the server fills them in before SetDefaults runs and
-+	// they are never nil. Only a value an administrator actually stored should
-+	// win over this, which is what adminHasChosen checks.
-+	if cfg.getJobServiceURL() != "" {
-+		if !p.adminHasChosen("enablerecordings") {
++	// Infer availability from the job service only when the administrator has
++	// chosen neither a stored value nor an environment override. Manifest
++	// defaults are already filled in, so nil pointers cannot identify defaults.
++	if strings.TrimSpace(cfg.getJobServiceURL()) != "" {
++		if _, overridden := p.configEnvOverrides["EnableRecordings"]; !overridden && !p.adminHasChosen("enablerecordings") {
 +			cfg.EnableRecordings = model.NewPointer(true)
 +		}
-+		if !p.adminHasChosen("enabletranscriptions") {
++		if _, overridden := p.configEnvOverrides["EnableTranscriptions"]; !overridden && !p.adminHasChosen("enabletranscriptions") {
 +			cfg.EnableTranscriptions = model.NewPointer(true)
 +		}
 +	}
@@ -50,3 +45,120 @@ index c6f07fc..ee98b97 100644
  	if l := p.API.GetLicense(); l != nil && license.IsCloud(l) {
  		// On Cloud installations we want calls enabled in all channels so we
  		// override it since the plugin's default is now false.
+diff --git a/server/maintainedmost_configuration_test.go b/server/maintainedmost_configuration_test.go
+new file mode 100644
+index 0000000..8964cc8
+--- /dev/null
++++ b/server/maintainedmost_configuration_test.go
+@@ -0,0 +1,111 @@
++// Copyright (c) 2026-present Mattermore contributors. All Rights Reserved.
++// See LICENSE.txt for license information.
++
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"testing"
++
++	pluginMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost/server/public/plugin"
++	"github.com/mattermost/mattermost/server/public/model"
++	"github.com/mattermost/mattermost/server/public/plugin"
++	"github.com/stretchr/testify/require"
++)
++
++func TestMaintainedMostRecordingDefaults(t *testing.T) {
++	for _, tc := range []struct {
++		name               string
++		url                string
++		stored             map[string]any
++		env                map[string]string
++		wantRecordings     bool
++		wantTranscriptions bool
++	}{
++		{name: "no job URL"},
++		{name: "blank job URL", url: "  "},
++		{name: "stored job URL", url: "http://offloader:4545", wantRecordings: true, wantTranscriptions: true},
++		{
++			name:           "environment job URL",
++			env:            map[string]string{"MM_CALLS_JOB_SERVICE_URL": "http://offloader:4545"},
++			wantRecordings: true, wantTranscriptions: true,
++		},
++		{
++			name: "stored false wins over defaults", url: "http://offloader:4545",
++			stored: map[string]any{"enablerecordings": false, "enabletranscriptions": false},
++		},
++		{
++			name:           "stored true is retained without a job URL",
++			stored:         map[string]any{"enablerecordings": true, "enabletranscriptions": true},
++			wantRecordings: true, wantTranscriptions: true,
++		},
++		{
++			name: "environment false without stored choices", url: "http://offloader:4545",
++			env: map[string]string{"MM_CALLS_ENABLE_RECORDINGS": "false", "MM_CALLS_ENABLE_TRANSCRIPTIONS": "false"},
++		},
++		{
++			name: "environment false overrides stored true", url: "http://offloader:4545",
++			stored: map[string]any{"enablerecordings": true, "enabletranscriptions": true},
++			env:    map[string]string{"MM_CALLS_ENABLE_RECORDINGS": "false", "MM_CALLS_ENABLE_TRANSCRIPTIONS": "false"},
++		},
++		{
++			name: "environment false with stored false", url: "http://offloader:4545",
++			stored: map[string]any{"enablerecordings": false, "enabletranscriptions": false},
++			env:    map[string]string{"MM_CALLS_ENABLE_RECORDINGS": "false", "MM_CALLS_ENABLE_TRANSCRIPTIONS": "false"},
++		},
++		{
++			name: "environment true overrides stored false", url: "http://offloader:4545",
++			stored:         map[string]any{"enablerecordings": false, "enabletranscriptions": false},
++			env:            map[string]string{"MM_CALLS_ENABLE_RECORDINGS": "true", "MM_CALLS_ENABLE_TRANSCRIPTIONS": "true"},
++			wantRecordings: true, wantTranscriptions: true,
++		},
++		{
++			name: "transcription opt out is independent", url: "http://offloader:4545",
++			env:            map[string]string{"MM_CALLS_ENABLE_TRANSCRIPTIONS": "false"},
++			wantRecordings: true,
++		},
++		{
++			name: "recording opt out disables effective transcription", url: "http://offloader:4545",
++			env:                map[string]string{"MM_CALLS_ENABLE_RECORDINGS": "false"},
++			wantTranscriptions: true,
++		},
++		{
++			name: "empty environment job URL clears stored URL", url: "http://offloader:4545",
++			env: map[string]string{"MM_CALLS_JOB_SERVICE_URL": ""},
++		},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			for _, key := range []string{"MM_CALLS_JOB_SERVICE_URL", "MM_CALLS_ENABLE_RECORDINGS", "MM_CALLS_ENABLE_TRANSCRIPTIONS"} {
++				t.Setenv(key, "")
++				require.NoError(t, os.Unsetenv(key))
++			}
++			for key, value := range tc.env {
++				t.Setenv(key, value)
++			}
++
++			api := pluginMocks.NewMockAPI(t)
++			api.On("GetLicense").Return((*model.License)(nil))
++			api.On("GetConfig").Return(&model.Config{
++				PluginSettings: model.PluginSettings{Plugins: map[string]map[string]any{manifest.Id: tc.stored}},
++			}).Maybe()
++			p := &Plugin{MattermostPlugin: plugin.MattermostPlugin{API: api}}
++			cfg := &configuration{JobServiceURL: tc.url}
++			data, err := json.Marshal(tc.stored)
++			require.NoError(t, err)
++			require.NoError(t, json.Unmarshal(data, cfg))
++			cfg.SetDefaults()
++			p.setOverrides(cfg)
++
++			require.Equal(t, tc.wantRecordings, *cfg.EnableRecordings)
++			require.Equal(t, tc.wantTranscriptions, *cfg.EnableTranscriptions)
++			require.Equal(t, tc.wantRecordings && tc.wantTranscriptions, cfg.transcriptionsEnabled())
++			if value, ok := tc.env["MM_CALLS_ENABLE_RECORDINGS"]; ok {
++				require.Equal(t, value, p.configEnvOverrides["EnableRecordings"])
++			}
++			if value, ok := tc.env["MM_CALLS_ENABLE_TRANSCRIPTIONS"]; ok {
++				require.Equal(t, value, p.configEnvOverrides["EnableTranscriptions"])
++			}
++		})
++	}
++}

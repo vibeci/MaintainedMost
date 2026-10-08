@@ -18,7 +18,7 @@ redeem the invite or sign in, which made the rest of the lift useless.
 
 Guest accounts now follow GuestAccountsSettings.Enable alone.
 
-See https://mattermore.dev/guest-accounts
+Guest account controls remain available in the System Console.
 ---
  server/channels/api4/role.go      | 14 ++------------
  server/channels/api4/role_test.go | 10 +++++-----

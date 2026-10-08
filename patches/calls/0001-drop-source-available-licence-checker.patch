@@ -20,7 +20,7 @@ index 0edfbf2..0b93f70 100644
  	if p.isSingleHandler() {
  		if err := p.cleanUpState(); err != nil {
 diff --git a/server/bot_api_test.go b/server/bot_api_test.go
-index 5e9f6c3..a32fbb4 100644
+index 5e9f6c3..cb65c39 100644
 --- a/server/bot_api_test.go
 +++ b/server/bot_api_test.go
 @@ -11,7 +11,7 @@ import (
@@ -41,7 +41,19 @@ index 5e9f6c3..a32fbb4 100644
  
  	store, tearDown := NewTestStore(t)
  	t.Cleanup(tearDown)
-@@ -234,7 +234,7 @@ func TestHandleBotUploadData(t *testing.T) {
+@@ -52,11 +52,6 @@ func TestHandleBotGetProfileForSession(t *testing.T) {
+ 	mockMetrics.On("ObserveClusterMutexLockedTime", "mutex_call", mock.AnythingOfType("float64"))
+ 	mockMetrics.On("Handler").Return(nil).Once()
+ 
+-	mockAPI.On("GetConfig").Return(&model.Config{}, nil)
+-	mockAPI.On("GetLicense").Return(&model.License{
+-		SkuShortName: "enterprise",
+-	}, nil)
+-
+ 	apiRouter := p.newAPIRouter()
+ 
+ 	t.Run("no call ongoing", func(t *testing.T) {
+@@ -234,7 +229,7 @@ func TestHandleBotUploadData(t *testing.T) {
  		callsClusterLocks: map[string]*cluster.Mutex{},
  	}
  
@@ -50,8 +62,85 @@ index 5e9f6c3..a32fbb4 100644
  
  	mockMetrics.On("Handler").Return(nil).Once()
  
+@@ -253,10 +248,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 
+ 		uploadID := model.NewId()
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(nil, &model.AppError{
+ 			Message:    "upload session not found",
+ 			StatusCode: http.StatusNotFound,
+@@ -288,10 +279,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			UserId: botUserID,
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 
+ 		w := httptest.NewRecorder()
+@@ -321,10 +308,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			UserId: otherUserID,
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 
+ 		w := httptest.NewRecorder()
+@@ -353,10 +336,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			UserId: botUserID,
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 		mockAPI.On("GetConfig").Return(nil).Once()
+ 
+@@ -393,10 +372,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			},
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 		mockAPI.On("GetConfig").Return(config).Once()
+ 		mockAPI.On("UploadData", us, mock.Anything).Return(nil, &model.AppError{
+@@ -437,10 +412,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			},
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 		mockAPI.On("GetConfig").Return(config).Once()
+ 		mockAPI.On("UploadData", us, mock.Anything).Return(nil, nil).Once()
+@@ -479,10 +450,6 @@ func TestHandleBotUploadData(t *testing.T) {
+ 			Size: 100,
+ 		}
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "enterprise",
+-		}, nil).Once()
+ 		mockAPI.On("GetUploadSession", uploadID).Return(us, nil).Once()
+ 		mockAPI.On("GetConfig").Return(config).Once()
+ 		mockAPI.On("UploadData", us, mock.Anything).Return(fileInfo, nil).Once()
 diff --git a/server/configuration_test.go b/server/configuration_test.go
-index 9683a0e..b807ce3 100644
+index 9683a0e..3f6fd8a 100644
 --- a/server/configuration_test.go
 +++ b/server/configuration_test.go
 @@ -8,7 +8,7 @@ import (
@@ -63,7 +152,7 @@ index 9683a0e..b807ce3 100644
  	pluginMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost/server/public/plugin"
  	"github.com/mattermost/mattermost/server/public/plugin"
  
-@@ -223,7 +223,7 @@ func TestGetClientConfig(t *testing.T) {
+@@ -223,13 +223,12 @@ func TestGetClientConfig(t *testing.T) {
  		MattermostPlugin: plugin.MattermostPlugin{
  			API: mockAPI,
  		},
@@ -72,6 +161,33 @@ index 9683a0e..b807ce3 100644
  	}
  
  	mockAPI.On("GetLicense").Return(&model.License{
+ 		SkuShortName: "starter",
+ 	})
+-	mockAPI.On("GetConfig").Return(&model.Config{})
+ 
+ 	clientCfg := p.getClientConfig(p.getConfiguration())
+ 
+@@ -245,14 +244,18 @@ func TestGetClientConfig(t *testing.T) {
+ 	require.Equal(t, true, *clientCfg.AllowEnableCalls)
+ 	require.Equal(t, p.getConfiguration().DefaultEnabled, clientCfg.DefaultEnabled)
+ 
+-	// Host controls
+-	require.Equal(t, false, clientCfg.HostControlsAllowed)
++	// Capabilities are available independently of the reported SKU.
++	require.True(t, clientCfg.HostControlsAllowed)
++	require.True(t, clientCfg.GroupCallsAllowed)
++	require.Equal(t, "starter", clientCfg.SkuShortName)
+ 	mockAPI.On("GetLicense").Unset()
+ 	mockAPI.On("GetLicense").Return(&model.License{
+ 		SkuShortName: "professional",
+ 	})
+ 	clientCfg = p.getClientConfig(p.getConfiguration())
+ 	require.Equal(t, true, clientCfg.HostControlsAllowed)
++	require.True(t, clientCfg.GroupCallsAllowed)
++	require.Equal(t, "professional", clientCfg.SkuShortName)
+ 
+ 	// admin config
+ 	adminClientCfg := p.getAdminClientConfig(p.getConfiguration())
 diff --git a/server/license/checker.go b/server/license/checker.go
 new file mode 100644
 index 0000000..22b0810
@@ -93,7 +209,7 @@ index 0000000..22b0810
 +	GetConfig() *model.Config
 +}
 +
-+// Checker replaces the Source Available licence checker. Mattermore ships
++// Checker replaces the Source Available licence checker. MaintainedMost ships
 +// every call feature to every server, so each answer is unconditionally yes
 +// and no licence is inspected.
 +type Checker struct {
@@ -118,19 +234,47 @@ index 0000000..22b0810
 +
 +// GroupCallsAllowed reports whether a call may have more than two people.
 +func (c *Checker) GroupCallsAllowed() bool { return true }
+diff --git a/server/license/checker_test.go b/server/license/checker_test.go
+new file mode 100644
+index 0000000..07cb017
+--- /dev/null
++++ b/server/license/checker_test.go
+@@ -0,0 +1,21 @@
++// Copyright (c) 2026-present Mattermore contributors. All Rights Reserved.
++// See LICENSE.txt for license information.
++
++package license
++
++import "testing"
++
++func TestMaintainedMostFeaturesWithoutLicense(t *testing.T) {
++	checker := NewChecker(nil)
++	for feature, allowed := range map[string]bool{
++		"rtcd":           checker.RTCDAllowed(),
++		"recordings":     checker.RecordingsAllowed(),
++		"transcriptions": checker.TranscriptionsAllowed(),
++		"host controls":  checker.HostControlsAllowed(),
++		"group calls":    checker.GroupCallsAllowed(),
++	} {
++		if !allowed {
++			t.Errorf("%s must be available without a license", feature)
++		}
++	}
++}
 diff --git a/server/plugin.go b/server/plugin.go
-index f890dff..683497b 100644
+index f890dff..7bcb7c5 100644
 --- a/server/plugin.go
 +++ b/server/plugin.go
-@@ -15,7 +15,7 @@ import (
+@@ -15,8 +15,8 @@ import (
  	"github.com/mattermost/mattermost-plugin-calls/server/batching"
  	"github.com/mattermost/mattermost-plugin-calls/server/cluster"
  	"github.com/mattermost/mattermost-plugin-calls/server/db"
 -	"github.com/mattermost/mattermost-plugin-calls/server/enterprise"
-+	"github.com/mattermost/mattermost-plugin-calls/server/license"
  	"github.com/mattermost/mattermost-plugin-calls/server/interfaces"
++	"github.com/mattermost/mattermost-plugin-calls/server/license"
  
  	rtcd "github.com/mattermost/rtcd/service"
+ 	"github.com/mattermost/rtcd/service/rtc"
 @@ -36,7 +36,7 @@ const (
  // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
  type Plugin struct {
@@ -141,7 +285,7 @@ index f890dff..683497b 100644
  	// configurationLock synchronizes access to the configuration.
  	configurationLock sync.RWMutex
 diff --git a/server/session_test.go b/server/session_test.go
-index d8ba1df..6cb46ab 100644
+index d8ba1df..7227596 100644
 --- a/server/session_test.go
 +++ b/server/session_test.go
 @@ -8,7 +8,7 @@ import (
@@ -162,8 +306,107 @@ index d8ba1df..6cb46ab 100644
  
  	store, tearDown := NewTestStore(t)
  	t.Cleanup(tearDown)
+@@ -51,11 +51,6 @@ func TestAddUserSession(t *testing.T) {
+ 		defer mockAPI.AssertExpectations(t)
+ 		defer mockMetrics.AssertExpectations(t)
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "professional",
+-		}, nil).Once()
+-
+ 		var cs *callState
+ 		state, err := p.addUserSession(cs, model.NewPointer(false), "userID", "connID", "channelID", "", model.ChannelTypeOpen)
+ 		require.Nil(t, state)
+@@ -67,11 +62,6 @@ func TestAddUserSession(t *testing.T) {
+ 		defer mockMetrics.AssertExpectations(t)
+ 		defer ResetTestStore(t, p.store)
+ 
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Once()
+-		mockAPI.On("GetLicense").Return(&model.License{
+-			SkuShortName: "professional",
+-		}, nil).Once()
+-
+ 		// We'd be starting a new call
+ 		mockMetrics.On("IncWebSocketEvent", "out", wsEventCallHostChanged).Once()
+ 		mockAPI.On("PublishWebSocketEvent", wsEventCallHostChanged, mock.Anything,
+@@ -106,58 +96,24 @@ func TestAddUserSession(t *testing.T) {
+ 		require.Equal(t, retState, retState2)
+ 	})
+ 
+-	t.Run("allow calls in DMs only when unlicensed", func(t *testing.T) {
++	t.Run("allow calls in every channel type without a license", func(t *testing.T) {
+ 		defer mockAPI.AssertExpectations(t)
+ 		defer mockMetrics.AssertExpectations(t)
+-		defer ResetTestStore(t, p.store)
+-
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(6)
+-		mockAPI.On("GetLicense").Return(&model.License{}, nil).Times(3)
+-
+-		t.Run("public channel", func(t *testing.T) {
+-			mockAPI.On("SendEphemeralPost", "userA", &model.Post{
+-				ChannelId: "channelID",
+-				Message:   "app.add_user_session.group_calls_not_allowed_error",
+-			}).Return(nil).Once()
+-
+-			retState, err := p.addUserSession(nil, model.NewPointer(true), "userA", "connA", "channelID", "", model.ChannelTypeOpen)
+-			require.Equal(t, errGroupCallsNotAllowed, err)
+-			require.Nil(t, retState)
+-		})
+ 
+-		t.Run("private channel", func(t *testing.T) {
+-			mockAPI.On("SendEphemeralPost", "userA", &model.Post{
+-				ChannelId: "channelID",
+-				Message:   "app.add_user_session.group_calls_not_allowed_error",
+-			}).Return(nil).Once()
+-
+-			retState, err := p.addUserSession(nil, model.NewPointer(true), "userA", "connA", "channelID", "", model.ChannelTypePrivate)
+-			require.Equal(t, errGroupCallsNotAllowed, err)
+-			require.Nil(t, retState)
+-		})
+-
+-		t.Run("group channel", func(t *testing.T) {
+-			mockAPI.On("SendEphemeralPost", "userA", &model.Post{
+-				ChannelId: "channelID",
+-				Message:   "app.add_user_session.group_calls_not_allowed_error",
+-			}).Return(nil).Once()
+-
+-			retState, err := p.addUserSession(nil, model.NewPointer(true), "userA", "connA", "channelID", "", model.ChannelTypeGroup)
+-			require.Equal(t, errGroupCallsNotAllowed, err)
+-			require.Nil(t, retState)
+-		})
+-
+-		t.Run("direct channel", func(t *testing.T) {
+-			mockMetrics.On("IncWebSocketEvent", "out", wsEventCallHostChanged).Once()
+-			mockAPI.On("PublishWebSocketEvent", wsEventCallHostChanged, mock.Anything,
+-				&model.WebsocketBroadcast{UserId: "userA", ChannelId: "channelID", ReliableClusterSend: true}).Once()
+-
+-			retState, err := p.addUserSession(nil, model.NewPointer(true), "userA", "connA", "channelID", "", model.ChannelTypeDirect)
+-			require.NoError(t, err)
+-			require.NotNil(t, retState)
+-			require.Equal(t, map[string]struct{}{"userA": {}}, retState.Props.Participants)
+-			require.Len(t, retState.sessions, 1)
+-			require.NotNil(t, retState.sessions["connA"])
+-		})
++		for _, channelType := range []model.ChannelType{model.ChannelTypeOpen, model.ChannelTypePrivate, model.ChannelTypeGroup, model.ChannelTypeDirect} {
++			t.Run(string(channelType), func(t *testing.T) {
++				defer ResetTestStore(t, p.store)
++				mockMetrics.On("IncWebSocketEvent", "out", wsEventCallHostChanged).Once()
++				mockAPI.On("PublishWebSocketEvent", wsEventCallHostChanged, mock.Anything,
++					&model.WebsocketBroadcast{UserId: "userA", ChannelId: "channelID", ReliableClusterSend: true}).Once()
++
++				retState, err := p.addUserSession(nil, model.NewPointer(true), "userA", "connA", "channelID", "", channelType)
++				require.NoError(t, err)
++				require.NotNil(t, retState)
++				require.Equal(t, map[string]struct{}{"userA": {}}, retState.Props.Participants)
++				require.Len(t, retState.sessions, 1)
++				require.NotNil(t, retState.sessions["connA"])
++			})
++		}
+ 	})
+ }
 diff --git a/server/websocket_test.go b/server/websocket_test.go
-index 8645e99..e0d4cf3 100644
+index 8645e99..2b90b3a 100644
 --- a/server/websocket_test.go
 +++ b/server/websocket_test.go
 @@ -15,7 +15,7 @@ import (
@@ -184,3 +427,21 @@ index 8645e99..e0d4cf3 100644
  
  	mockMetrics.On("RTCMetrics").Return(mockRTCMetrics).Once()
  	mockAPI.On("LogDebug", mock.Anything, mock.Anything, mock.Anything,
+@@ -863,7 +863,7 @@ func TestHandleJoin(t *testing.T) {
+ 			&model.WebsocketBroadcast{UserId: userID, ChannelId: channelID, ReliableClusterSend: true}).Once()
+ 		// Call started post creation
+ 		mockAPI.On("GetUser", userID).Return(&model.User{Id: userID}, nil).Once()
+-		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(4)
++		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(3)
+ 		mockAPI.On("CreatePost", mock.AnythingOfType("*model.Post")).Return(&model.Post{Id: postID}, nil).Once()
+ 		createPost(t, store, postID, userID, channelID)
+ 
+@@ -1004,7 +1004,7 @@ func TestHandleJoin(t *testing.T) {
+ 			if i == 0 {
+ 				// Call started post creation
+ 				mockAPI.On("GetUser", userID).Return(&model.User{Id: userID}, nil).Once()
+-				mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(4)
++				mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(3)
+ 				mockAPI.On("CreatePost", mock.AnythingOfType("*model.Post")).Return(&model.Post{Id: postID}, nil).Once()
+ 				createPost(t, store, postID, userID, channelID)
+ 

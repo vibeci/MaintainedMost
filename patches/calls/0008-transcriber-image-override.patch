@@ -1,0 +1,326 @@
+diff --git a/server/job_service.go b/server/job_service.go
+index 0bbdfd9..88ed644 100644
+--- a/server/job_service.go
++++ b/server/job_service.go
+@@ -360,6 +360,10 @@ func applyEnvOverrides(inputData job.InputData, prefix string) {
+ 	for _, env := range os.Environ() {
+ 		if strings.HasPrefix(env, prefix) {
+ 			if parts := strings.SplitN(env, "=", 2); len(parts) == 2 {
++				// This selects the runner, not a setting inside the job container.
++				if parts[0] == "MM_CALLS_TRANSCRIBER_IMAGE" {
++					continue
++				}
+ 				key := strings.ToLower(strings.TrimPrefix(parts[0], prefix))
+ 				inputData[key] = parts[1]
+ 			}
+@@ -420,6 +424,9 @@ func (p *Plugin) initJobService() error {
+ 		return fmt.Errorf("failed to get transcriber version from manifest")
+ 	}
+ 	transcriberJobRunner = fmt.Sprintf("%s/%s:%s", registry, job.TranscribingJobPrefix, transcriberVersion)
++	if image := os.Getenv("MM_CALLS_TRANSCRIBER_IMAGE"); image != "" {
++		transcriberJobRunner = image
++	}
+ 
+ 	// We only initialize the transcriber runner (image prefetch) if transcriptions are enabled.
+ 	// We still need to set the runner above in case they are enabled at a later point.
+diff --git a/server/maintainedmost_transcriber_test.go b/server/maintainedmost_transcriber_test.go
+new file mode 100644
+index 0000000..43b8df9
+--- /dev/null
++++ b/server/maintainedmost_transcriber_test.go
+@@ -0,0 +1,295 @@
++// Copyright (c) 2020-present Mattermost, Inc. All Rights Reserved.
++// See LICENSE.txt for license information.
++
++package main
++
++import (
++	"encoding/json"
++	"fmt"
++	"net/http"
++	"net/http/httptest"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/mattermost/calls-offloader/public/job"
++	transcriber "github.com/mattermost/calls-transcriber/cmd/transcriber/config"
++	serverMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost-plugin-calls/server/interfaces"
++	pluginMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost/server/public/plugin"
++	"github.com/mattermost/mattermost/server/public/model"
++	"github.com/mattermost/mattermost/server/public/plugin"
++
++	"github.com/stretchr/testify/mock"
++	"github.com/stretchr/testify/require"
++)
++
++// Exercise initialization and dispatch through the real offloader HTTP client.
++// Enforce the stock offloader validators without running Docker containers.
++func maintainedmostJobService(t *testing.T, registry string, transcriptions bool) (*Plugin, <-chan job.ServiceConfig, <-chan job.Config) {
++	t.Helper()
++	for _, env := range os.Environ() {
++		key, _, _ := strings.Cut(env, "=")
++		if strings.HasPrefix(key, "MM_CALLS_TRANSCRIBER_") || strings.HasPrefix(key, "MM_CALLS_RECORDER_") {
++			t.Setenv(key, "")
++			require.NoError(t, os.Unsetenv(key))
++		}
++	}
++	oldRecorder, oldTranscriber := recorderJobRunner, transcriberJobRunner
++	t.Cleanup(func() { recorderJobRunner, transcriberJobRunner = oldRecorder, oldTranscriber })
++	t.Setenv("DEV_MODE", "")
++	t.Setenv("TEST_MODE", "")
++	t.Setenv("MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY", registry)
++	if registry == "" {
++		registry = job.ImageRegistryDefault
++	}
++
++	inits := make(chan job.ServiceConfig, 1)
++	jobs := make(chan job.Config, 2)
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		w.Header().Set("Content-Type", "application/json")
++		if r.Method == http.MethodGet && r.URL.Path == "/version" {
++			fmt.Fprint(w, `{"buildVersion":"v0.9.4"}`)
++			return
++		}
++		clientID, authKey, ok := r.BasicAuth()
++		if !ok || clientID != "test-client" || authKey != "test-auth-key" {
++			t.Error("offloader request is missing authentication")
++			w.WriteHeader(http.StatusUnauthorized)
++			return
++		}
++		switch {
++		case r.Method == http.MethodPost && r.URL.Path == "/jobs/init":
++			var cfg job.ServiceConfig
++			if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
++				t.Error(err)
++				w.WriteHeader(http.StatusBadRequest)
++				return
++			}
++			if err := cfg.IsValid(registry); err != nil {
++				w.WriteHeader(http.StatusBadRequest)
++				if err := json.NewEncoder(w).Encode(map[string]string{"error": "invalid job service config: " + err.Error()}); err != nil {
++					t.Error(err)
++				}
++				return
++			}
++			inits <- cfg
++		case r.Method == http.MethodPost && r.URL.Path == "/jobs":
++			var cfg job.Config
++			if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
++				t.Error(err)
++				w.WriteHeader(http.StatusBadRequest)
++				return
++			}
++			if err := cfg.IsValid(registry); err != nil {
++				w.WriteHeader(http.StatusBadRequest)
++				if err := json.NewEncoder(w).Encode(map[string]string{"error": err.Error()}); err != nil {
++					t.Error(err)
++				}
++				return
++			}
++			jobs <- cfg
++			fmt.Fprint(w, `{"id":"offloader-job-id"}`)
++		default:
++			t.Errorf("unexpected offloader request: %s %s", r.Method, r.URL.Path)
++			w.WriteHeader(http.StatusNotFound)
++		}
++	}))
++	t.Cleanup(srv.Close)
++	t.Setenv("MM_CALLS_JOB_SERVICE_CLIENT_ID", "test-client")
++	t.Setenv("MM_CALLS_JOB_SERVICE_AUTH_KEY", "test-auth-key")
++	t.Setenv("MM_CALLS_JOB_SERVICE_URL", srv.URL)
++
++	mockAPI := &pluginMocks.MockAPI{}
++	mockMetrics := &serverMocks.MockMetrics{}
++	for _, key := range []string{"mutex_job_service_registration", "mutex_job_service_runner_update"} {
++		mockAPI.On("KVSetWithOptions", key, []byte{1}, mock.Anything).Return(true, nil).Once()
++		mockAPI.On("KVDelete", key).Return(nil).Once()
++		mockMetrics.On("ObserveClusterMutexGrabTime", key, mock.Anything).Once()
++		mockMetrics.On("ObserveClusterMutexLockedTime", key, mock.Anything).Once()
++	}
++	mockAPI.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
++	mockAPI.On("LogDebug", mock.Anything, mock.Anything, mock.Anything,
++		mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
++	mockAPI.On("GetConfig").Return(&model.Config{
++		ServiceSettings: model.ServiceSettings{SiteURL: model.NewPointer("https://mattermost.example.com")},
++	}).Maybe()
++	t.Cleanup(func() {
++		mockAPI.AssertExpectations(t)
++		mockMetrics.AssertExpectations(t)
++	})
++	cfg := &configuration{}
++	cfg.SetDefaults()
++	cfg.EnableRecordings = model.NewPointer(true)
++	cfg.EnableTranscriptions = model.NewPointer(transcriptions)
++	cfg.JobServiceURL = srv.URL
++	p := &Plugin{
++		MattermostPlugin: plugin.MattermostPlugin{API: mockAPI},
++		configuration:    cfg,
++		metrics:          mockMetrics,
++	}
++	t.Cleanup(func() {
++		if svc := p.getJobService(); svc != nil {
++			require.NoError(t, svc.Close())
++		}
++	})
++	return p, inits, jobs
++}
++
++func TestMaintainedMostTranscriberImageRunners(t *testing.T) {
++	const registry = "ghcr.io/example/maintainedmost"
++	for _, tc := range []struct {
++		name     string
++		registry string
++		image    string
++		enabled  bool
++	}{
++		{name: "upstream defaults", enabled: true},
++		{name: "registry defaults", registry: registry, enabled: true},
++		{name: "transcriber tag override only", image: "mattermost/calls-transcriber:v1.5.0", enabled: true},
++		{name: "release tag in shared registry", registry: registry, image: registry + "/calls-transcriber:v1.5.0", enabled: true},
++		{name: "development tag in shared registry", registry: registry, image: registry + "/calls-transcriber:v1.0.0-dev0", enabled: true},
++		{name: "disabled until later", registry: registry, image: registry + "/calls-transcriber:v1.5.0"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			p, inits, jobs := maintainedmostJobService(t, tc.registry, tc.enabled)
++			t.Setenv("MM_CALLS_TRANSCRIBER_IMAGE", tc.image)
++			require.NoError(t, p.initJobService())
++			registry := tc.registry
++			if registry == "" {
++				registry = job.ImageRegistryDefault
++			}
++			recorderRunner := fmt.Sprintf("%s/%s:%s", registry, job.RecordingJobPrefix, manifest.Props["calls_recorder_version"])
++			transcriberRunner := fmt.Sprintf("%s/%s:%s", registry, job.TranscribingJobPrefix, manifest.Props["calls_transcriber_version"])
++			if tc.image != "" {
++				transcriberRunner = tc.image
++			}
++			wantRunners := []string{recorderRunner}
++			if tc.enabled {
++				wantRunners = append(wantRunners, transcriberRunner)
++			}
++			require.Equal(t, wantRunners, (<-inits).Runners)
++
++			// The runner must also be ready if transcriptions are enabled later.
++			cfg := p.getConfiguration()
++			cfg.EnableTranscriptions = model.NewPointer(true)
++			require.NoError(t, p.setConfiguration(cfg))
++			for _, jt := range []job.Type{job.TypeRecording, job.TypeTranscribing} {
++				id, err := p.getJobService().RunJob(jt, model.NewId(), model.NewId(), model.NewId(), model.NewId())
++				require.NoError(t, err)
++				require.Equal(t, "offloader-job-id", id)
++				sent := <-jobs
++				require.Equal(t, jt, sent.Type)
++				require.NotContains(t, sent.InputData, "image")
++				if jt == job.TypeRecording {
++					require.Equal(t, recorderRunner, sent.Runner)
++				} else {
++					require.Equal(t, transcriberRunner, sent.Runner)
++					require.Equal(t, "whisper.cpp", sent.InputData["transcribe_api"], "choosing an image must not opt into remote transcription")
++				}
++			}
++		})
++	}
++}
++
++func TestMaintainedMostTranscriberLateJobEnvironment(t *testing.T) {
++	const registry = "ghcr.io/example/maintainedmost"
++	const image = registry + "/calls-transcriber:v1.5.0"
++	p, inits, jobs := maintainedmostJobService(t, registry, true)
++	t.Setenv("MM_CALLS_TRANSCRIBER_IMAGE", image)
++	options := map[string]string{
++		"TRANSCRIBE_API":             "openai/api",
++		"OPENAI_API_BASE_URL":        "https://speech.example.com/v1",
++		"OPENAI_API_KEY":             "test-key=with-padding",
++		"OPENAI_API_MODEL":           "whisper-large-v3",
++		"OPENAI_API_TIMEOUT_SECONDS": "17",
++	}
++	for key, value := range options {
++		t.Setenv("MM_CALLS_TRANSCRIBER_"+key, value)
++	}
++	require.NoError(t, p.initJobService())
++	<-inits
++	callID, postID, jobID, authToken := model.NewId(), model.NewId(), model.NewId(), model.NewId()
++	_, err := p.getJobService().RunJob(job.TypeTranscribing, callID, postID, jobID, authToken)
++	require.NoError(t, err)
++	sent := <-jobs
++	require.Equal(t, image, sent.Runner)
++	require.Equal(t, int64(*p.getConfiguration().MaxRecordingDuration*120), sent.MaxDurationSec)
++	require.Equal(t, "https://mattermost.example.com", sent.InputData["site_url"])
++	require.Equal(t, callID, sent.InputData["call_id"])
++	require.Equal(t, postID, sent.InputData["post_id"])
++	require.Equal(t, jobID, sent.InputData["transcription_id"])
++	require.Equal(t, authToken, sent.InputData["auth_token"])
++	require.NotContains(t, sent.InputData, "image")
++	for key, value := range options {
++		require.Equal(t, value, sent.InputData[strings.ToLower(key)])
++		require.Contains(t, sent.InputData.ToEnv(), key+"="+value)
++	}
++	require.Contains(t, sent.InputData.ToEnv(), "TRANSCRIBE_API_OPTIONS=null")
++	require.Equal(t, transcriber.TranscribeAPI(transcriber.TranscribeAPIWhisperCPP), p.getConfiguration().TranscribeAPI)
++	_, err = p.getJobService().RunJob(job.TypeRecording, callID, postID, jobID, authToken)
++	require.NoError(t, err)
++	recorded := <-jobs
++	require.Equal(t, fmt.Sprintf("%s/%s:%s", registry, job.RecordingJobPrefix, manifest.Props["calls_recorder_version"]), recorded.Runner)
++	for key := range options {
++		require.NotContains(t, recorded.InputData, strings.ToLower(key))
++	}
++	require.NotContains(t, recorded.InputData, "image")
++
++	// Calls still validates against the upstream module before applying the
++	// job-only overrides. Setting the plugin field itself is not supported.
++	cfg := p.getConfiguration()
++	cfg.TranscribeAPI = "openai/api"
++	require.EqualError(t, cfg.IsValid(), "TranscribeAPI is not valid")
++}
++
++func TestMaintainedMostTranscriberImageRejections(t *testing.T) {
++	const registry = "ghcr.io/example/maintainedmost"
++	for _, tc := range []struct {
++		name  string
++		image string
++	}{
++		{name: "wrong image name", image: registry + "/transcriber:v1.5.0"},
++		{name: "legacy image layout", image: registry + ":v1.5.0-transcriber"},
++		{name: "non-semver tag", image: registry + "/calls-transcriber:latest"},
++		{name: "unsupported tag suffix", image: registry + "/calls-transcriber:v1.5.0-transcriber"},
++		{name: "wrong registry", image: "ghcr.io/other/maintainedmost/calls-transcriber:v1.5.0"},
++		{name: "digest", image: registry + "/calls-transcriber@sha256:" + strings.Repeat("a", 64)},
++		{name: "below minimum version", image: registry + "/calls-transcriber:v0.0.0"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			for _, enabled := range []bool{true, false} {
++				t.Run(fmt.Sprintf("enabled_at_init=%t", enabled), func(t *testing.T) {
++					p, inits, jobs := maintainedmostJobService(t, registry, enabled)
++					t.Setenv("MM_CALLS_TRANSCRIBER_IMAGE", tc.image)
++					if enabled {
++						require.ErrorContains(t, p.initJobService(), "request failed: invalid job service config:")
++						require.Nil(t, p.getJobService())
++						require.Empty(t, inits, "invalid runners must not be accepted for prefetch")
++						require.Empty(t, jobs)
++						return
++					}
++
++					// A disabled transcriber is not prefetched. Its runner must
++					// still be rejected by /jobs when transcriptions are enabled.
++					require.NoError(t, p.initJobService())
++					recorderRunner := fmt.Sprintf("%s/%s:%s", registry, job.RecordingJobPrefix, manifest.Props["calls_recorder_version"])
++					require.Equal(t, []string{recorderRunner}, (<-inits).Runners)
++					cfg := p.getConfiguration()
++					cfg.EnableTranscriptions = model.NewPointer(true)
++					require.NoError(t, p.setConfiguration(cfg))
++					id, err := p.getJobService().RunJob(job.TypeTranscribing, model.NewId(), model.NewId(), model.NewId(), model.NewId())
++					require.ErrorContains(t, err, "request failed: invalid Runner value:")
++					require.Empty(t, id)
++					require.Empty(t, jobs, "invalid runner must not create a job")
++
++					id, err = p.getJobService().RunJob(job.TypeRecording, model.NewId(), model.NewId(), model.NewId(), model.NewId())
++					require.NoError(t, err)
++					require.Equal(t, "offloader-job-id", id)
++					recorded := <-jobs
++					require.Equal(t, recorderRunner, recorded.Runner)
++					require.NotContains(t, recorded.InputData, "image")
++				})
++			}
++		})
++	}
++}

@@ -1,0 +1,20 @@
+{
+  "providers": {
+    "provider-1": {
+      "type": "openai-responses",
+      "base_url": "https://private-provider.invalid/v1",
+      "api_key": "file:/run/secrets/llm_api_key"
+    }
+  },
+  "models": {
+    "model-1": {
+      "provider": "provider-1",
+      "model": "mock-marker",
+      "max_tokens": 32000
+    }
+  },
+  "roles": {
+    "audit": "model-1",
+    "resolve": ["model-1"]
+  }
+}

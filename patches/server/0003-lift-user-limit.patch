@@ -12,7 +12,7 @@ constants instead of repeating them, so a future rescale does not break them
 again. channels/api4/limits_test.go cannot see the unexported constants, so it
 keeps literals with a pointer to where they live.
 
-See https://mattermore.dev/user-limit
+The enforced caps are defined in server/channels/app/limits.go.
 ---
  server/channels/api4/limits_test.go     |  6 ++++--
  server/channels/app/limits.go           |  8 ++++++--
@@ -50,7 +50,7 @@ index 45448e4b..7be39d71 100644
 +	// Upstream caps an unlicensed server at 200 soft / 250 hard users. Scaled by 1000
 +	// so the limit never binds on a self-hosted install while the soft/hard ratio and
 +	// every code path that assumes a non-zero limit stay intact.
-+	// See https://mattermore.dev/user-limit
++	// Keep the soft and hard limits in sync when changing these caps.
 +	maxUsersLimit     = 200000
 +	maxUsersHardLimit = 250000
  )
@@ -144,4 +144,3 @@ index 22de6150..a02003de 100644
  
 -- 
 2.53.0
-

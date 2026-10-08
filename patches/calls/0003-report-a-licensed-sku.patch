@@ -11,12 +11,144 @@ index 218c4bb..9739171 100644
 -    const enterprise = license.SkuShortName === LicenseSkus.Enterprise || license.SkuShortName === LicenseSkus.EntepriseAdvanced;
 -    return !isCloud(state) && !enterprise;
 -};
-+// Mattermore: every feature this used to restrict (recordings, transcriptions,
++// MaintainedMost: every feature this used to restrict (recordings, transcriptions,
 +// live captions, rtcd) is served by open source components and its server-side
 +// licence gate is already lifted, so nothing is enterprise-only on premise any
 +// more. Returning false renders the real admin fields instead of an upsell.
-+// See https://mattermore.dev/licensing
++// The underlying services must still be configured before these features work.
 +export const isOnPremNotEnterprise = (_state: GlobalState): boolean => false;
  
  export const isAtLeastProfessional = (state: GlobalState): boolean => {
      const sku = callsConfig(state).sku_short_name;
+diff --git a/webapp/src/components/admin_console_settings/recordings/enable_live_captions.test.tsx b/webapp/src/components/admin_console_settings/recordings/enable_live_captions.test.tsx
+index 26537a9..c78e42b 100644
+--- a/webapp/src/components/admin_console_settings/recordings/enable_live_captions.test.tsx
++++ b/webapp/src/components/admin_console_settings/recordings/enable_live_captions.test.tsx
+@@ -231,7 +231,7 @@ describe('EnableLiveCaptions', () => {
+         expect(screen.queryByText('Enable live captions (Beta)')).not.toBeInTheDocument();
+     });
+ 
+-    it('should not render when not enterprise', () => {
++    it('should render without an enterprise license', () => {
+         renderComponent({}, {
+             'plugins-com.mattermost.calls': {
+                 callsConfig: {
+@@ -248,6 +248,6 @@ describe('EnableLiveCaptions', () => {
+             },
+         });
+ 
+-        expect(screen.queryByText('Enable live captions (Beta)')).not.toBeInTheDocument();
++        expect(screen.getByText('Enable live captions (Beta)')).toBeInTheDocument();
+     });
+ });
+diff --git a/webapp/src/components/admin_console_settings/recordings/enable_transcriptions.test.tsx b/webapp/src/components/admin_console_settings/recordings/enable_transcriptions.test.tsx
+index 88a7bbb..a2b53a5 100644
+--- a/webapp/src/components/admin_console_settings/recordings/enable_transcriptions.test.tsx
++++ b/webapp/src/components/admin_console_settings/recordings/enable_transcriptions.test.tsx
+@@ -210,7 +210,7 @@ describe('EnableTranscriptions', () => {
+         expect(screen.queryByText('Enable call transcriptions (Beta)')).not.toBeInTheDocument();
+     });
+ 
+-    it('should not render when not enterprise', () => {
++    it('should render without an enterprise license', () => {
+         renderComponent({}, {
+             'plugins-com.mattermost.calls': {
+                 callsConfig: {
+@@ -226,6 +226,6 @@ describe('EnableTranscriptions', () => {
+             },
+         });
+ 
+-        expect(screen.queryByText('Enable call transcriptions (Beta)')).not.toBeInTheDocument();
++        expect(screen.getByText('Enable call transcriptions (Beta)')).toBeInTheDocument();
+     });
+ });
+diff --git a/webapp/src/components/admin_console_settings/recordings/job_service_url.test.tsx b/webapp/src/components/admin_console_settings/recordings/job_service_url.test.tsx
+index d1817c7..6bd1844 100644
+--- a/webapp/src/components/admin_console_settings/recordings/job_service_url.test.tsx
++++ b/webapp/src/components/admin_console_settings/recordings/job_service_url.test.tsx
+@@ -141,7 +141,7 @@ describe('JobServiceURL', () => {
+         expect(screen.queryByText('Job service URL')).not.toBeInTheDocument();
+     });
+ 
+-    it('should not render when not enterprise', () => {
++    it('should render without an enterprise license', () => {
+         renderComponent({}, {
+             'plugins-com.mattermost.calls': {
+                 callsConfig: {
+@@ -157,6 +157,6 @@ describe('JobServiceURL', () => {
+             },
+         });
+ 
+-        expect(screen.queryByText('Job service URL')).not.toBeInTheDocument();
++        expect(screen.getByText('Job service URL')).toBeInTheDocument();
+     });
+ });
+diff --git a/webapp/src/components/admin_console_settings/sections/call_live_captions.test.tsx b/webapp/src/components/admin_console_settings/sections/call_live_captions.test.tsx
+index 968b20d..c3b7dac 100644
+--- a/webapp/src/components/admin_console_settings/sections/call_live_captions.test.tsx
++++ b/webapp/src/components/admin_console_settings/sections/call_live_captions.test.tsx
+@@ -105,7 +105,7 @@ describe('CallLiveCaptionsSection', () => {
+         expect(screen.queryByText('Live captions')).not.toBeInTheDocument();
+     });
+ 
+-    it('should not render when not enterprise', () => {
++    it('should render without an enterprise license', () => {
+         renderComponent({
+             entities: {
+                 general: {
+@@ -114,6 +114,6 @@ describe('CallLiveCaptionsSection', () => {
+             },
+         });
+ 
+-        expect(screen.queryByText('Live captions')).not.toBeInTheDocument();
++        expect(screen.getByText('Live captions')).toBeInTheDocument();
+     });
+ });
+diff --git a/webapp/src/components/admin_console_settings/sections/call_recordings.test.tsx b/webapp/src/components/admin_console_settings/sections/call_recordings.test.tsx
+index 1301836..9ff5249 100644
+--- a/webapp/src/components/admin_console_settings/sections/call_recordings.test.tsx
++++ b/webapp/src/components/admin_console_settings/sections/call_recordings.test.tsx
+@@ -58,7 +58,7 @@ describe('CallRecordingsSection', () => {
+         expect(screen.getByTestId('setting2')).toBeInTheDocument();
+     });
+ 
+-    it('should render with trial button for non-enterprise', () => {
++    it('should render settings without a license or an upsell', () => {
+         renderComponent({
+             entities: {
+                 general: {
+@@ -70,9 +70,10 @@ describe('CallRecordingsSection', () => {
+             },
+         });
+ 
+-        expect(screen.getByText('Get access to call recordings, transcriptions, and live captions')).toBeInTheDocument();
+-        expect(screen.getAllByText('Try free for 30 days')[0]).toBeInTheDocument();
+-        expect(screen.queryByTestId('setting1')).not.toBeInTheDocument();
++        expect(screen.getByText('Call recordings')).toBeInTheDocument();
++        expect(screen.queryByText('Try free for 30 days')).not.toBeInTheDocument();
++        expect(screen.getByTestId('setting1')).toBeInTheDocument();
++        expect(screen.getByTestId('setting2')).toBeInTheDocument();
+     });
+ 
+     it('should not render on cloud', () => {
+diff --git a/webapp/src/components/admin_console_settings/sections/call_transcriptions.test.tsx b/webapp/src/components/admin_console_settings/sections/call_transcriptions.test.tsx
+index 66181cd..7d1e4d5 100644
+--- a/webapp/src/components/admin_console_settings/sections/call_transcriptions.test.tsx
++++ b/webapp/src/components/admin_console_settings/sections/call_transcriptions.test.tsx
+@@ -92,7 +92,7 @@ describe('CallTranscriptionsSection', () => {
+         expect(screen.queryByText('Call transcriptions')).not.toBeInTheDocument();
+     });
+ 
+-    it('should not render when not enterprise', () => {
++    it('should render without an enterprise license', () => {
+         renderComponent({
+             'plugins-com.mattermost.calls': {
+                 callsConfig: {
+@@ -107,6 +107,6 @@ describe('CallTranscriptionsSection', () => {
+             },
+         });
+ 
+-        expect(screen.queryByText('Call transcriptions')).not.toBeInTheDocument();
++        expect(screen.getByText('Call transcriptions')).toBeInTheDocument();
+     });
+ });

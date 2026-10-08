@@ -34,7 +34,7 @@ index 3f2d00b..735dbc5 100644
 +Example:
 +
 +```
-+docker run --network=host --name calls-transcriber -e "SITE_URL=http://127.0.0.1:8065/" -e "AUTH_TOKEN=ohqd1phqtt8m3gsfg8j5ymymqy" -e "CALL_ID=9c86b3q57fgfpqr8jq3b9yjweh" -e "POST_ID=e4pdmi6rqpn7pp9sity9hiza3r" -e "TRANSCRIBE_API=openai/api" -e "OPENAI_API_KEY=sk-..." -v calls-transcriber-volume:/recs mattermost/calls-transcriber
++docker run --network=host --name calls-transcriber -e "SITE_URL=http://127.0.0.1:8065/" -e "AUTH_TOKEN=ohqd1phqtt8m3gsfg8j5ymymqy" -e "CALL_ID=9c86b3q57fgfpqr8jq3b9yjweh" -e "POST_ID=e4pdmi6rqpn7pp9sity9hiza3r" -e "TRANSCRIBE_API=openai/api" -e "OPENAI_API_KEY=sk-..." -v calls-transcriber-volume:/recs maintainedmost/calls-transcriber:v1.0.0-dev0
 +```
 +
 +> **_Note_**
@@ -49,10 +49,10 @@ index 3f2d00b..735dbc5 100644
  Run `make help` to see available options.
 diff --git a/cmd/transcriber/apis/openai/client.go b/cmd/transcriber/apis/openai/client.go
 new file mode 100644
-index 0000000..7d89da0
+index 0000000..d87282d
 --- /dev/null
 +++ b/cmd/transcriber/apis/openai/client.go
-@@ -0,0 +1,362 @@
+@@ -0,0 +1,404 @@
 +// Package openai implements a transcription backend for any service exposing an
 +// OpenAI compatible /v1/audio/transcriptions endpoint (e.g. OpenAI, Groq,
 +// LocalAI, a self-hosted whisper server).
@@ -68,6 +68,7 @@ index 0000000..7d89da0
 +	"fmt"
 +	"io"
 +	"log/slog"
++	"math"
 +	"mime/multipart"
 +	"net/http"
 +	"net/url"
@@ -95,9 +96,8 @@ index 0000000..7d89da0
 +
 +	// Transient failures (e.g. rate limiting, network errors) are retried.
 +	// Authentication and other client errors are not.
-+	maxAttempts     = 3
-+	retryBackoff    = 500 * time.Millisecond
-+	maxErrBodyBytes = 1024
++	maxAttempts  = 3
++	retryBackoff = 500 * time.Millisecond
 +)
 +
 +// The local whisper.cpp path returns ISO 639-1 codes while some OpenAI
@@ -133,7 +133,7 @@ index 0000000..7d89da0
 +
 +	u, err := url.Parse(c.BaseURL)
 +	if err != nil {
-+		return fmt.Errorf("invalid BaseURL: parsing failed: %w", err)
++		return fmt.Errorf("invalid BaseURL: parsing failed")
 +	} else if u.Scheme != "http" && u.Scheme != "https" {
 +		return fmt.Errorf("invalid BaseURL: invalid scheme %q", u.Scheme)
 +	}
@@ -187,8 +187,10 @@ index 0000000..7d89da0
 +func (e permanentError) Unwrap() error { return e.err }
 +
 +type Client struct {
-+	cfg Config
-+	url string
++	cfg    Config
++	url    string
++	ctx    context.Context
++	cancel context.CancelFunc
 +
 +	httpClient *http.Client
 +
@@ -205,9 +207,12 @@ index 0000000..7d89da0
 +
 +	slog.Debug("creating transcription client", slog.Any("cfg", cfg))
 +
++	ctx, cancel := context.WithCancel(context.Background())
 +	return &Client{
-+		cfg: cfg,
-+		url: strings.TrimSuffix(cfg.BaseURL, "/") + transcriptionsPath,
++		cfg:    cfg,
++		url:    strings.TrimSuffix(cfg.BaseURL, "/") + transcriptionsPath,
++		ctx:    ctx,
++		cancel: cancel,
 +		// The timeout is enforced per request through the request's context.
 +		httpClient:     &http.Client{},
 +		maxUploadBytes: maxUploadBytesDefault,
@@ -257,17 +262,18 @@ index 0000000..7d89da0
 +}
 +
 +func (c *Client) Destroy() error {
++	c.cancel()
 +	c.httpClient.CloseIdleConnections()
 +	return nil
 +}
 +
 +type transcriptionResponse struct {
-+	Language string `json:"language"`
-+	Text     string `json:"text"`
++	Language string  `json:"language"`
++	Text     *string `json:"text"`
 +	Segments []struct {
-+		Start float64 `json:"start"`
-+		End   float64 `json:"end"`
-+		Text  string  `json:"text"`
++		Start *float64 `json:"start"`
++		End   *float64 `json:"end"`
++		Text  *string  `json:"text"`
 +	} `json:"segments"`
 +}
 +
@@ -280,13 +286,16 @@ index 0000000..7d89da0
 +	durMs := int64(len(samples) / (audioSampleRate / 1000))
 +
 +	for attempt := 1; ; attempt++ {
++		if err := c.ctx.Err(); err != nil {
++			return nil, "", err
++		}
 +		res, err := c.doRequest(body, contentType)
 +		if err == nil {
 +			return segmentsFromResponse(res, durMs)
 +		}
 +
 +		var permErr permanentError
-+		if errors.As(err, &permErr) || attempt == maxAttempts {
++		if errors.Is(err, context.Canceled) || errors.As(err, &permErr) || attempt == maxAttempts {
 +			return nil, "", err
 +		}
 +
@@ -294,7 +303,13 @@ index 0000000..7d89da0
 +			slog.String("err", err.Error()),
 +			slog.Int("attempt", attempt))
 +
-+		time.Sleep(time.Duration(attempt) * retryBackoff)
++		timer := time.NewTimer(time.Duration(attempt) * retryBackoff)
++		select {
++		case <-c.ctx.Done():
++			timer.Stop()
++			return nil, "", c.ctx.Err()
++		case <-timer.C:
++		}
 +	}
 +}
 +
@@ -328,12 +343,12 @@ index 0000000..7d89da0
 +}
 +
 +func (c *Client) doRequest(body []byte, contentType string) (*transcriptionResponse, error) {
-+	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
++	ctx, cancel := context.WithTimeout(c.ctx, c.cfg.Timeout)
 +	defer cancel()
 +
 +	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(body))
 +	if err != nil {
-+		return nil, permanentError{fmt.Errorf("failed to create request: %w", err)}
++		return nil, permanentError{fmt.Errorf("failed to create transcription request")}
 +	}
 +	req.Header.Set("Content-Type", contentType)
 +	if c.cfg.APIKey != "" {
@@ -342,27 +357,51 @@ index 0000000..7d89da0
 +
 +	res, err := c.httpClient.Do(req)
 +	if err != nil {
-+		return nil, fmt.Errorf("failed to send request: %w", err)
++		return nil, transportError("failed to send request", err)
 +	}
 +	defer res.Body.Close()
 +
 +	if res.StatusCode != http.StatusOK {
-+		// The error body is read back to help debugging but it's bounded as we
-+		// have no control over its size.
-+		data, _ := io.ReadAll(io.LimitReader(res.Body, maxErrBodyBytes))
-+		err := fmt.Errorf("request failed with status %q: %s", res.Status, strings.TrimSpace(string(data)))
++		// Provider bodies and status text can echo credentials or call audio.
++		err := fmt.Errorf("request failed with status %d %s", res.StatusCode, http.StatusText(res.StatusCode))
 +		if !isRetryableStatus(res.StatusCode) {
 +			return nil, permanentError{err}
 +		}
 +		return nil, err
 +	}
 +
++	// Finish reading before decoding so an interrupted HTTP body is retried,
++	// even if its first bytes happened to contain a complete JSON value.
++	data, err := io.ReadAll(res.Body)
++	if err != nil {
++		return nil, transportError("failed to read response body", err)
++	}
 +	var tr transcriptionResponse
-+	if err := json.NewDecoder(res.Body).Decode(&tr); err != nil {
-+		return nil, permanentError{fmt.Errorf("failed to decode response body: %w", err)}
++	if err := json.Unmarshal(data, &tr); err != nil {
++		return nil, permanentError{fmt.Errorf("invalid transcription response JSON")}
++	}
++	if tr.Text == nil && tr.Segments == nil {
++		return nil, permanentError{fmt.Errorf("unsupported transcription response")}
++	}
++	for _, s := range tr.Segments {
++		if s.Start == nil || s.End == nil || s.Text == nil ||
++			*s.Start < 0 || *s.End < *s.Start || *s.End >= float64(math.MaxInt64)/1000 {
++			return nil, permanentError{fmt.Errorf("invalid transcription response segment")}
++		}
 +	}
 +
 +	return &tr, nil
++}
++
++// Preserve useful sentinel errors, but never include untrusted transport error
++// strings: they may contain request URLs, headers or response body fragments.
++func transportError(message string, err error) error {
++	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, io.ErrUnexpectedEOF} {
++		if errors.Is(err, cause) {
++			return fmt.Errorf("%s: %w", message, cause)
++		}
++	}
++	return fmt.Errorf("%s: transport error", message)
 +}
 +
 +// isRetryableStatus reports whether a request that failed with the given status
@@ -378,7 +417,10 @@ index 0000000..7d89da0
 +	lang := normalizeLanguage(res.Language)
 +
 +	if len(res.Segments) == 0 {
-+		text := strings.TrimSpace(res.Text)
++		var text string
++		if res.Text != nil {
++			text = strings.TrimSpace(*res.Text)
++		}
 +		if text == "" {
 +			return nil, lang, nil
 +		}
@@ -398,10 +440,10 @@ index 0000000..7d89da0
 +	segments := make([]transcribe.Segment, 0, len(res.Segments))
 +	for _, s := range res.Segments {
 +		segments = append(segments, transcribe.Segment{
-+			Text: s.Text,
++			Text: *s.Text,
 +			// Timestamps are returned in seconds, ours are in milliseconds.
-+			StartTS: int64(s.Start * 1000),
-+			EndTS:   int64(s.End * 1000),
++			StartTS: int64(*s.Start * 1000),
++			EndTS:   int64(*s.End * 1000),
 +		})
 +	}
 +
@@ -417,10 +459,10 @@ index 0000000..7d89da0
 +}
 diff --git a/cmd/transcriber/apis/openai/client_test.go b/cmd/transcriber/apis/openai/client_test.go
 new file mode 100644
-index 0000000..204dc15
+index 0000000..0d7c1ab
 --- /dev/null
 +++ b/cmd/transcriber/apis/openai/client_test.go
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,231 @@
 +package openai
 +
 +import (
@@ -450,6 +492,7 @@ index 0000000..204dc15
 +	})
 +	require.NoError(t, err)
 +	require.NotNil(t, c)
++	t.Cleanup(func() { require.NoError(t, c.Destroy()) })
 +
 +	return c
 +}
@@ -552,7 +595,7 @@ index 0000000..204dc15
 +	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 +		reqs.Add(1)
 +		w.WriteHeader(http.StatusUnauthorized)
-+		fmt.Fprint(w, `{"error": {"message": "Incorrect API key provided."}}`)
++		fmt.Fprint(w, `{"error": {"message": "Incorrect API key provided: test-api-key"}}`)
 +	}))
 +	defer srv.Close()
 +
@@ -561,7 +604,8 @@ index 0000000..204dc15
 +	_, _, err := c.Transcribe(make([]float32, 16000))
 +	require.Error(t, err)
 +	require.Contains(t, err.Error(), "401 Unauthorized")
-+	require.Contains(t, err.Error(), "Incorrect API key provided.")
++	require.NotContains(t, err.Error(), "Incorrect API key provided")
++	require.NotContains(t, err.Error(), "test-api-key")
 +	// Authentication failures should not be retried.
 +	require.Equal(t, int32(1), reqs.Load())
 +}
@@ -649,6 +693,236 @@ index 0000000..204dc15
 +	require.NoError(t, err)
 +	require.Empty(t, lang)
 +	require.Equal(t, []transcribe.Segment{{Text: "just text", StartTS: 0, EndTS: 2000}}, segments)
++}
+diff --git a/cmd/transcriber/apis/openai/maintainedmost_client_test.go b/cmd/transcriber/apis/openai/maintainedmost_client_test.go
+new file mode 100644
+index 0000000..280d0e9
+--- /dev/null
++++ b/cmd/transcriber/apis/openai/maintainedmost_client_test.go
+@@ -0,0 +1,224 @@
++package openai
++
++import (
++	"context"
++	"fmt"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/mattermost/calls-transcriber/cmd/transcriber/transcribe"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestMaintainedMostTranscribeRetriesInterruptedBody(t *testing.T) {
++	for _, body := range []string{`{"text":"`, `{"text":"incomplete transport"}`, ""} {
++		t.Run(body, func(t *testing.T) {
++			var requests atomic.Int32
++			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				if requests.Add(1) == 1 {
++					// The server closes before delivering the advertised body length.
++					w.Header().Set("Content-Length", "1000")
++					fmt.Fprint(w, body)
++					return
++				}
++				if r.Header.Get("Authorization") != "Bearer test-api-key" {
++					t.Error("retry lost authorization")
++				}
++				if err := r.ParseMultipartForm(1 << 20); err != nil {
++					t.Errorf("retry lost multipart body: %v", err)
++					return
++				}
++				defer r.MultipartForm.RemoveAll()
++				if r.FormValue("model") != ModelDefault || r.FormValue("response_format") != "verbose_json" {
++					t.Error("retry lost transcription options")
++				}
++				fmt.Fprint(w, `{"language":"english","segments":[{"start":0,"end":1,"text":"recovered"}]}`)
++			}))
++			defer srv.Close()
++
++			c := newTestClient(t, srv.URL+"/v1")
++			segments, lang, err := c.Transcribe(make([]float32, audioSampleRate))
++			require.NoError(t, err)
++			require.Equal(t, int32(2), requests.Load())
++			require.Equal(t, "en", lang)
++			require.Equal(t, []transcribe.Segment{{Text: "recovered", StartTS: 0, EndTS: 1000}}, segments)
++		})
++	}
++}
++
++func TestMaintainedMostTranscribeInterruptedBodyRetryLimit(t *testing.T) {
++	var requests atomic.Int32
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++		requests.Add(1)
++		w.Header().Set("Content-Length", "1000")
++		fmt.Fprint(w, `{"text":"test-api-key private-response`)
++	}))
++	defer srv.Close()
++
++	c := newTestClient(t, srv.URL+"/v1")
++	_, _, err := c.Transcribe(make([]float32, audioSampleRate))
++	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
++	require.NotContains(t, err.Error(), "test-api-key")
++	require.NotContains(t, err.Error(), "private-response")
++	require.Equal(t, int32(maxAttempts), requests.Load())
++}
++
++func TestMaintainedMostTranscribeBodyTimeout(t *testing.T) {
++	for _, recover := range []bool{true, false} {
++		t.Run(fmt.Sprintf("recover=%t", recover), func(t *testing.T) {
++			var requests atomic.Int32
++			stopCh := make(chan struct{})
++			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				if requests.Add(1) > 1 && recover {
++					fmt.Fprint(w, `{"text":"recovered"}`)
++					return
++				}
++				fmt.Fprint(w, `{"text":"test-api-key private-response`)
++				w.(http.Flusher).Flush()
++				select {
++				case <-r.Context().Done():
++				case <-stopCh:
++				}
++			}))
++			defer srv.Close()
++			defer close(stopCh)
++
++			c := newTestClient(t, srv.URL+"/v1")
++			c.cfg.Timeout = 100 * time.Millisecond
++			segments, _, err := c.Transcribe(make([]float32, audioSampleRate))
++			if recover {
++				require.NoError(t, err)
++				require.Equal(t, int32(2), requests.Load())
++				require.Equal(t, []transcribe.Segment{{Text: "recovered", EndTS: 1000}}, segments)
++			} else {
++				require.ErrorIs(t, err, context.DeadlineExceeded)
++				require.NotContains(t, err.Error(), "test-api-key")
++				require.NotContains(t, err.Error(), "private-response")
++				require.Equal(t, int32(maxAttempts), requests.Load())
++			}
++		})
++	}
++}
++
++func TestMaintainedMostTranscribeBodyCancellation(t *testing.T) {
++	var requests atomic.Int32
++	started := make(chan struct{}, maxAttempts)
++	stopCh := make(chan struct{})
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		requests.Add(1)
++		fmt.Fprint(w, `{"text":"test-api-key private-response`)
++		w.(http.Flusher).Flush()
++		started <- struct{}{}
++		select {
++		case <-r.Context().Done():
++		case <-stopCh:
++		}
++	}))
++	defer srv.Close()
++	defer close(stopCh)
++
++	c := newTestClient(t, srv.URL+"/v1")
++	c.cfg.Timeout = 10 * time.Second
++	done := make(chan error, 1)
++	go func() {
++		_, _, err := c.Transcribe(make([]float32, audioSampleRate))
++		done <- err
++	}()
++	select {
++	case <-started:
++	case <-time.After(5 * time.Second):
++		t.Fatal("request did not start")
++	}
++	require.NoError(t, c.Destroy())
++	select {
++	case err := <-done:
++		require.ErrorIs(t, err, context.Canceled)
++		require.NotContains(t, err.Error(), "test-api-key")
++		require.NotContains(t, err.Error(), "private-response")
++	case <-time.After(time.Second):
++		t.Fatal("cancellation did not interrupt the response body read")
++	}
++	require.Equal(t, int32(1), requests.Load())
++	_, _, err := c.Transcribe(make([]float32, audioSampleRate))
++	require.ErrorIs(t, err, context.Canceled)
++	require.Equal(t, int32(1), requests.Load(), "a destroyed client must not start another request")
++}
++
++func TestMaintainedMostTranscribeInvalidResponseIsPermanent(t *testing.T) {
++	for name, body := range map[string]string{
++		"syntax":                              `{"text":test-api-key private-response}`,
++		"incomplete JSON, complete HTTP body": `{"text":"test-api-key private-response`,
++		"text type":                           `{"text":["test-api-key private-response"]}`,
++		"segment type":                        `{"segments":[{"start":"test-api-key private-response","end":1,"text":"text"}]}`,
++		"missing timestamp":                   `{"segments":[{"end":1,"text":"test-api-key private-response"}]}`,
++		"missing segment text":                `{"segments":[{"start":0,"end":1}]}`,
++		"backwards timestamps":                `{"segments":[{"start":2,"end":1,"text":"test-api-key private-response"}]}`,
++		"overflowing timestamp":               `{"segments":[{"start":0,"end":1e30,"text":"test-api-key private-response"}]}`,
++		"unsupported object":                  `{"error":"test-api-key private-response"}`,
++		"empty object":                        `{}`,
++		"null":                                `null`,
++		"null text":                           `{"text":null}`,
++		"trailing JSON":                       `{"text":"test-api-key private-response"}{}`,
++		"HTML":                                `<html>test-api-key private-response</html>`,
++		"empty body":                          "",
++	} {
++		t.Run(name, func(t *testing.T) {
++			var requests atomic.Int32
++			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++				requests.Add(1)
++				fmt.Fprint(w, body)
++			}))
++			defer srv.Close()
++
++			c := newTestClient(t, srv.URL+"/v1")
++			_, _, err := c.Transcribe(make([]float32, audioSampleRate))
++			var permanent permanentError
++			require.ErrorAs(t, err, &permanent)
++			require.NotContains(t, err.Error(), "test-api-key")
++			require.NotContains(t, err.Error(), "private-response")
++			require.Equal(t, int32(1), requests.Load())
++		})
++	}
++}
++
++func TestMaintainedMostTranscribeSilence(t *testing.T) {
++	for _, body := range []string{`{"text":""}`, `{"segments":[]}`} {
++		t.Run(body, func(t *testing.T) {
++			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++				fmt.Fprint(w, body)
++			}))
++			defer srv.Close()
++			c := newTestClient(t, srv.URL+"/v1")
++			segments, _, err := c.Transcribe(make([]float32, audioSampleRate))
++			require.NoError(t, err)
++			require.Empty(t, segments)
++		})
++	}
++}
++
++func TestMaintainedMostTranscribeUntrustedStatusIsRedacted(t *testing.T) {
++	var requests atomic.Int32
++	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
++		requests.Add(1)
++		conn, rw, err := w.(http.Hijacker).Hijack()
++		if err != nil {
++			t.Errorf("hijack: %v", err)
++			return
++		}
++		defer conn.Close()
++		fmt.Fprint(rw, "HTTP/1.1 401 test-api-key private-response\r\nContent-Length: 0\r\n\r\n")
++		if err := rw.Flush(); err != nil {
++			t.Errorf("flush: %v", err)
++		}
++	}))
++	defer srv.Close()
++	c := newTestClient(t, srv.URL+"/v1")
++	_, _, err := c.Transcribe(make([]float32, audioSampleRate))
++	require.EqualError(t, err, "failed to transcribe chunk: request failed with status 401 Unauthorized")
++	require.Equal(t, int32(1), requests.Load())
 +}
 diff --git a/cmd/transcriber/apis/openai/wav.go b/cmd/transcriber/apis/openai/wav.go
 new file mode 100644
@@ -781,3 +1055,96 @@ index b929049..dc5b062 100644
  func (cfg CallTranscriberConfig) IsValidURL() error {
  	if cfg.SiteURL == "" {
  		return fmt.Errorf("SiteURL cannot be empty")
+diff --git a/cmd/transcriber/config/maintainedmost_openai_test.go b/cmd/transcriber/config/maintainedmost_openai_test.go
+new file mode 100644
+index 0000000..6274ce2
+--- /dev/null
++++ b/cmd/transcriber/config/maintainedmost_openai_test.go
+@@ -0,0 +1,87 @@
++package config
++
++import (
++	"encoding/json"
++	"fmt"
++	"strings"
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++func TestMaintainedMostOpenAIJobConfigRoundTrip(t *testing.T) {
++	oldInTranscriber := inTranscriber
++	inTranscriber = "true"
++	t.Cleanup(func() { inTranscriber = oldInTranscriber })
++	for _, api := range []string{TranscribeAPIWhisperCPP, TranscribeAPIOpenAIAPI} {
++		t.Run(api, func(t *testing.T) {
++			cfg := CallTranscriberConfig{
++				SiteURL:         "https://mattermost.example.com",
++				CallID:          "8w8jorhr7j83uqr6y1st894hqe",
++				PostID:          "udzdsg7dwidbzcidx5khrf8nee",
++				AuthToken:       "qj75unbsef83ik9p7ueypb6iyw",
++				TranscriptionID: "on5yfih5etn5m8rfdidamc1oxa",
++				NumThreads:      1,
++			}
++			cfg.SetDefaults()
++			require.Equal(t, TranscribeAPI(TranscribeAPIWhisperCPP), cfg.TranscribeAPI)
++			input := cfg.ToMap()
++			// Calls applies these job-only overrides after validating its local
++			// config. The offloader serializes the map and uppercases env keys.
++			input["transcribe_api"] = api
++			options := map[string]string{
++				"OPENAI_API_BASE_URL":        "https://speech.example.com/v1",
++				"OPENAI_API_KEY":             "test-key=with-padding",
++				"OPENAI_API_MODEL":           "whisper-large-v3",
++				"OPENAI_API_TIMEOUT_SECONDS": "17",
++			}
++			for key, value := range options {
++				input[strings.ToLower(key)] = value
++			}
++			data, err := json.Marshal(input)
++			require.NoError(t, err)
++			var wireInput map[string]any
++			require.NoError(t, json.Unmarshal(data, &wireInput))
++			var fromMap CallTranscriberConfig
++			require.NoError(t, fromMap.FromMap(wireInput).IsValid())
++			require.Equal(t, TranscribeAPI(api), fromMap.TranscribeAPI)
++			for key, value := range wireInput {
++				t.Setenv(strings.ToUpper(key), fmt.Sprint(value))
++			}
++			fromEnv, err := FromEnv()
++			require.NoError(t, err)
++			fromEnv.SetDefaults()
++			require.NoError(t, fromEnv.IsValid())
++			require.Equal(t, fromMap, fromEnv)
++			for key, value := range options {
++				require.Equal(t, value, fromEnv.APIOption(key))
++			}
++		})
++	}
++}
++
++func TestMaintainedMostOpenAIAPIOptionPrecedence(t *testing.T) {
++	t.Setenv("OPENAI_API_KEY", "environment-key")
++	for _, tc := range []struct {
++		name    string
++		options map[string]any
++		want    string
++	}{
++		{name: "environment fallback", want: "environment-key"},
++		{name: "JSON options win", options: map[string]any{"OPENAI_API_KEY": "job-key"}, want: "job-key"},
++		{name: "empty falls back", options: map[string]any{"OPENAI_API_KEY": ""}, want: "environment-key"},
++		{name: "non-string falls back", options: map[string]any{"OPENAI_API_KEY": 7}, want: "environment-key"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			data, err := json.Marshal(tc.options)
++			require.NoError(t, err)
++			t.Setenv("TRANSCRIBE_API_OPTIONS", string(data))
++			cfg, err := FromEnv()
++			require.NoError(t, err)
++			require.Equal(t, tc.want, cfg.APIOption("OPENAI_API_KEY"))
++			var roundTrip CallTranscriberConfig
++			roundTrip.FromMap(cfg.ToMap())
++			require.Equal(t, tc.want, roundTrip.APIOption("OPENAI_API_KEY"))
++		})
++	}
++}

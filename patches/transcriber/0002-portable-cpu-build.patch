@@ -1,0 +1,58 @@
+diff --git a/build/prepare_deps.sh b/build/prepare_deps.sh
+index 0a098cf..1b008b1 100644
+--- a/build/prepare_deps.sh
++++ b/build/prepare_deps.sh
+@@ -1,6 +1,8 @@
+ #!/bin/bash
+ set -ex
+ 
++SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++
+ OPUS_VERSION=$1
+ OPUS_SHA=$2
+ WHISPER_VERSION=$3
+@@ -25,6 +27,13 @@ if [ "$TARGET_ARCH" == "arm64" ]; then
+ 
+ 	echo "Adding CMAKE_ARGS on detected arm64 host";
+ 	CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_CPU_ARM_ARCH=armv8-a"
++elif [ "$TARGET_ARCH" == "amd64" ]; then
++	# Trade SIMD throughput for portable x86-64/SSE2 job images.
++	# GGML_NATIVE=OFF alone enables AVX/FMA defaults in Whisper 1.7.5.
++	CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=OFF -DGGML_AVX2=OFF \
++-DGGML_AVX_VNNI=OFF -DGGML_BMI2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF \
++-DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF \
++-DGGML_AVX512_BF16=OFF -DGGML_AMX_TILE=OFF -DGGML_AMX_INT8=OFF -DGGML_AMX_BF16=OFF"
+ fi
+ 
+ 
+@@ -46,6 +55,10 @@ wget https://github.com/ggerganov/whisper.cpp/archive/refs/tags/v${WHISPER_VERSI
+ echo "${WHISPER_SHA} v${WHISPER_VERSION}.tar.gz" | sha256sum --check && \
+ tar xf v${WHISPER_VERSION}.tar.gz && \
+ cd whisper.cpp-${WHISPER_VERSION} && \
++if [ "$TARGET_ARCH" == "amd64" ]; then
++	# This pinned GGML version otherwise forces SSE4.2 even with AVX disabled.
++	patch -p1 -F 0 -t -N < "$SCRIPT_DIR/whisper-cpu-baseline.patch"
++fi && \
+ for model in ${MODELS}; do ./models/download-ggml-model.sh "${model}"; done && \
+ PATH="$PATH:$CMAKE_PATH" cmake -B build ${CMAKE_ARGS} && \
+ PATH="$PATH:$CMAKE_PATH" cmake --build build -j --config Release && \
+diff --git a/build/whisper-cpu-baseline.patch b/build/whisper-cpu-baseline.patch
+new file mode 100644
+index 0000000..dba6dd0
+--- /dev/null
++++ b/build/whisper-cpu-baseline.patch
+@@ -0,0 +1,14 @@
++diff --git a/ggml/src/ggml-cpu/CMakeLists.txt b/ggml/src/ggml-cpu/CMakeLists.txt
++index c8cc32f..c5c722c 100644
++--- a/ggml/src/ggml-cpu/CMakeLists.txt
+++++ b/ggml/src/ggml-cpu/CMakeLists.txt
++@@ -232,8 +232,7 @@ function(ggml_add_cpu_backend_variant_impl tag_name)
++             if (GGML_NATIVE)
++                 list(APPEND ARCH_FLAGS -march=native)
++             else ()
++-                list(APPEND ARCH_FLAGS -msse4.2)
++-                list(APPEND ARCH_DEFINITIONS GGML_SSE42)
+++                list(APPEND ARCH_FLAGS -march=x86-64 -mtune=generic)
++                 if (GGML_F16C)
++                     list(APPEND ARCH_FLAGS -mf16c)
++                     list(APPEND ARCH_DEFINITIONS GGML_F16C)

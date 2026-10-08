@@ -1,4 +1,4 @@
-name: release
+name: MaintainedMost Release
 
 on:
   push:
@@ -6,68 +6,106 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: maintainedmost-release
+  cancel-in-progress: false
 
 jobs:
-  plugin:
-    name: calls plugin
+  metadata:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.tag }}
+      registry: ${{ steps.image.outputs.registry }}
+      transcriber: ${{ steps.image.outputs.transcriber }}
+      recorder: ${{ steps.image.outputs.recorder }}
     steps:
       - uses: actions/checkout@v4
-      - id: pin
-        run: grep -E '^[A-Z_]+=' upstream.env >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - uses: actions/setup-go@v5
-        with: { go-version: '1.26' }
-      - run: ./scripts/build-calls.sh dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: calls-plugin
-          path: dist/*
-      - if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          body: |
-            Built from upstream calls `${{ steps.pin.outputs.CALLS_TAG }}`.
+      - id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            [[ "$REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+              echo 'Only stable vMAJOR.MINOR.PATCH tags can be released' >&2
+              exit 1
+            }
+            tag="$REF_NAME"
+          else
+            tag="test-$GITHUB_SHA"
+          fi
+          image="ghcr.io/${REPOSITORY,,}:$tag"
+          ROOT="$PWD"
+          source "$ROOT/upstream.env"
+          source "$ROOT/scripts/lib.sh"
+          job_images "$image"
+          printf '%s\n' "tag=$image" "registry=$CALLS_IMAGE_REGISTRY" \
+            "transcriber=$TRANSCRIBER_IMAGE" "recorder=$RECORDER_IMAGE" >> "$GITHUB_OUTPUT"
 
-            Set `MM_CALLS_GROUP_CALLS_ALLOWED=true` on the server, then upload the
-            bundle in System Console > Plugins > Plugin Management.
-            Full instructions: https://mattermore.dev/install
+  build:
+    needs: metadata
+    uses: ./.github/workflows/build.yml
+    with:
+      image-tag: ${{ needs.metadata.outputs.image }}
+      export-images: true
 
-            Verify the download:
-
-            ```
-            sha256sum -c mattermore-calls-${{ steps.pin.outputs.CALLS_VERSION }}.tar.gz.sha256
-            ```
-
-  image:
-    name: server image
+  publish:
+    needs: [metadata, build]
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ${{ needs.metadata.outputs.image }}
+      CALLS_IMAGE_REGISTRY: ${{ needs.metadata.outputs.registry }}
+      TRANSCRIBER_IMAGE: ${{ needs.metadata.outputs.transcriber }}
+      RECORDER_IMAGE: ${{ needs.metadata.outputs.recorder }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - uses: actions/setup-go@v5
-        with: { go-version: '1.26' }
-
+      - uses: actions/download-artifact@v4
+        with:
+          name: maintainedmost-calls-plugin
+          path: dist/plugin
+      - uses: actions/download-artifact@v4
+        with:
+          name: maintainedmost-release-images
+          path: dist/images
+      - run: docker load -i dist/images/maintainedmost-images.tar
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build
-        env:
-          CONTAINER_ENGINE: docker
-        run: ./scripts/build-image.sh ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-
-      - name: Push
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Stage release assets (draft until all images are anonymously accessible)
         run: |
-          docker tag ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
-                     ghcr.io/${{ github.repository }}:latest
-          docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-          docker push ghcr.io/${{ github.repository }}:latest
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/release-draft"; then
+            test "$(< "$RUNNER_TEMP/release-draft")" = true || {
+              echo 'Refusing to overwrite an already published release' >&2
+              exit 1
+            }
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "MaintainedMost $RELEASE_TAG" \
+              --notes "Includes the MaintainedMost server, Calls plugin, patched transcriber ${TRANSCRIBER_IMAGE}, and mirrored recorder ${RECORDER_IMAGE}. Set MAINTAINEDMOST_IMAGE=${IMAGE} and CALLS_IMAGE_REGISTRY=${CALLS_IMAGE_REGISTRY} in Compose. Existing deployments must retain their previous COMPOSE_PROJECT_NAME to reuse named volumes. Plugin-only installs need MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY=${CALLS_IMAGE_REGISTRY}, MM_CALLS_TRANSCRIBER_IMAGE=${TRANSCRIBER_IMAGE}, and offloader JOBS_IMAGEREGISTRY=${CALLS_IMAGE_REGISTRY}."
+          fi
+          gh release upload "$RELEASE_TAG" dist/plugin/* --clobber
+      - name: Publish and verify job images
+        run: |
+          docker push "$RECORDER_IMAGE"
+          docker push "$TRANSCRIBER_IMAGE"
+          ./scripts/check-public-images.sh "$RECORDER_IMAGE" "$TRANSCRIBER_IMAGE"
+      - name: Publish and verify server
+        run: |
+          docker push "$IMAGE"
+          ./scripts/check-public-images.sh "$IMAGE"
+      - name: Promote latest image
+        run: |
+          docker tag "$IMAGE" "${IMAGE%:*}:latest"
+          docker push "${IMAGE%:*}:latest"
+      - name: Publish complete release
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -1,9 +1,37 @@
 node_modules/
 dist/
-.astro/
 
 __pycache__/
 *.pyc
 
 # Plugin build output
 build/
+
+# Private local configuration; keep public environment templates visible.
+.env
+.env.*
+!.env.example
+!.env.*.example
+.envrc
+.secrets/
+secrets/
+/maintenance/models.json
+/config.json
+/config.private.json
+/config.local.json
+/config/private/
+/config/local/
+/config/private.json
+/config/local.json
+/config/credentials.json
+/credentials.json
+
+# Local credential stores and private key material.
+.git-credentials
+.netrc
+.npmrc
+.pypirc
+*.key
+*.pem
+*.p12
+*.pfx

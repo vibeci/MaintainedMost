@@ -24,7 +24,7 @@ entry point, so the feature was unreachable. Removes the licence checks at:
 The two invite_as tests that asserted the self-hosted starter upsell now
 assert the opposite.
 
-See https://mattermore.dev/guest-accounts
+Guest account controls remain available in the System Console.
 ---
  .../admin_console/admin_definition.tsx        | 30 +++----------------
  .../permission_system_scheme_settings.tsx     |  4 +--
@@ -248,4 +248,3 @@ index 326e8569..e07ce7b1 100644
      let guestDisabledClass = '';
 -- 
 2.53.0
-

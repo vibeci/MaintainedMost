@@ -1,0 +1,35 @@
+diff --git a/server/public/model/config.go b/server/public/model/config.go
+index 9d27ea74..7f865ed8 100644
+--- a/server/public/model/config.go
++++ b/server/public/model/config.go
+@@ -171,11 +171,13 @@ const (
+ 
+ 	EmailSettingsDefaultFeedbackOrganization = ""
+ 
+-	SupportSettingsDefaultTermsOfServiceLink = "https://mattermost.com/pl/terms-of-use/"
+-	SupportSettingsDefaultPrivacyPolicyLink  = "https://mattermost.com/pl/privacy-policy/"
+-	SupportSettingsDefaultAboutLink          = "https://mattermost.com/pl/about-mattermost"
+-	SupportSettingsDefaultHelpLink           = "https://mattermost.com/pl/help/"
+-	SupportSettingsDefaultReportAProblemLink = "https://mattermost.com/pl/report-a-bug"
++	// Empty on purpose. The web app hides unconfigured footer/support links.
++	// Administrators can supply their own links; no project domain is assumed.
++	SupportSettingsDefaultTermsOfServiceLink = ""
++	SupportSettingsDefaultPrivacyPolicyLink  = ""
++	SupportSettingsDefaultAboutLink          = ""
++	SupportSettingsDefaultHelpLink           = ""
++	SupportSettingsDefaultReportAProblemLink = ""
+ 	SupportSettingsDefaultSupportEmail       = ""
+ 	SupportSettingsDefaultReAcceptancePeriod = 365
+ 
+@@ -218,9 +220,9 @@ const (
+ 	SamlSettingsCanonicalAlgorithmC14n11  = "Canonical1.1"
+ 	SamlSettingsDefaultCanonicalAlgorithm = SamlSettingsCanonicalAlgorithmC14n
+ 
+ 	NativeappSettingsDefaultAppDownloadLink        = "https://mattermost.com/pl/download-apps"
+-	NativeappSettingsDefaultAndroidAppDownloadLink = "https://mattermost.com/pl/android-app/"
+-	NativeappSettingsDefaultIosAppDownloadLink     = "https://mattermost.com/pl/ios-app/"
++	NativeappSettingsDefaultAndroidAppDownloadLink = "https://play.google.com/store/apps/details?id=com.mattermost.rn"
++	NativeappSettingsDefaultIosAppDownloadLink     = "https://apps.apple.com/app/mattermost/id1257222717"
+ 
+ 	ExperimentalSettingsDefaultLinkMetadataTimeoutMilliseconds                       = 5000
+ 	ExperimentalSettingsDefaultUsersStatusAndProfileFetchingPollIntervalMilliseconds = 3000

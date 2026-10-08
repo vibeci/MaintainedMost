@@ -1,0 +1,140 @@
+{
+  "server-api": {
+    "github.com/mattermost/mattermost/server/v8/channels/app": [
+      "TestMaintainedMostFilestoreSignatureEnforcement",
+      "TestMaintainedMostMarketplacePrepackagedInstall",
+      "TestMaintainedMostMarketplaceRemoteSignatures",
+      "TestMaintainedMostOIDCAuthorizationURL",
+      "TestMaintainedMostOIDCCallback",
+      "TestMaintainedMostOIDCConcurrentClients",
+      "TestMaintainedMostOIDCConnectionsClosed",
+      "TestMaintainedMostOIDCCreateOAuthUser",
+      "TestMaintainedMostPrepackagedSignatures",
+      "TestMaintainedMostTransitionalPrepackagedPersistence",
+      "TestMaintainedMostUnsignedPrepackagedStartup"
+    ],
+    "github.com/mattermost/mattermost/server/v8/channels/api4": [
+      "TestMaintainedMostPluginInstallGuards"
+    ]
+  },
+  "server-oidc": {
+    "github.com/mattermost/mattermost/server/v8/channels/app/oauthproviders/openid": [
+      "TestDiscoveryCache",
+      "TestDiscoveryDocumentIsValid",
+      "TestDiscoveryFetch",
+      "TestDiscoveryTransport",
+      "TestDiscoveryURL",
+      "TestEmailVerifiedClaim",
+      "TestGetSSOSettings",
+      "TestGetUserFromIdTokenRequiresExchange",
+      "TestGetUserFromJSON",
+      "TestIsSameUser",
+      "TestMaintainedMostDiscoveryCachePolicyIsolation",
+      "TestParseIDToken",
+      "TestRegistered",
+      "TestSubjectClaim",
+      "TestUsernameDerivation"
+    ]
+  },
+  "server-config": {
+    "github.com/mattermost/mattermost/server/v8/config": [
+      "TestGetClientConfig",
+      "TestGetLimitedClientConfig"
+    ]
+  },
+  "server-model": {
+    "github.com/mattermost/mattermost/server/public/model": [
+      "TestConfigAccessTagsMapToValidPermissions",
+      "TestConfigDefaultAIPluginState",
+      "TestConfigDefaultCallsPluginState",
+      "TestConfigDefaultChannelExportPluginState",
+      "TestConfigDefaultConnectedWorkspacesSettings",
+      "TestConfigDefaultEmailNotificationContentsType",
+      "TestConfigDefaultFileSettingsDirectory",
+      "TestConfigDefaultFileSettingsS3SSE",
+      "TestConfigDefaultNPSPluginState",
+      "TestConfigDefaultServiceSettingsExperimentalGroupUnreadChannels",
+      "TestConfigDefaultSignatureAlgorithm",
+      "TestConfigDefaults",
+      "TestConfigEmptySiteName",
+      "TestConfigEnableDeveloper",
+      "TestConfigExportSettingsDefaults",
+      "TestConfigExportSettingsIsValid",
+      "TestConfigFilteredByTag",
+      "TestConfigGetFileRetentionHours",
+      "TestConfigGetMessageRetentionHours",
+      "TestConfigImportSettingsDefaults",
+      "TestConfigImportSettingsIsValid",
+      "TestConfigIsValid",
+      "TestConfigIsValidDefaultAlgorithms",
+      "TestConfigIsValidFakeAlgorithm",
+      "TestConfigMarketplaceDefaults",
+      "TestConfigOverwriteAdminSettings",
+      "TestConfigOverwriteGuestSettings",
+      "TestConfigOverwriteSignatureAlgorithm",
+      "TestConfigSanitize",
+      "TestConfigServiceProviderDefault",
+      "TestConfigServiceSettingsIsValid",
+      "TestConfigToJSONFiltered",
+      "TestServiceSettingsIsValid",
+      "TestTeamSettingsDefaultJoinLeaveMessage",
+      "TestTeamSettingsIsValidSiteNameEmpty",
+      "TestTeamSettingsLockProfileFieldsForEmailUsersIsValid"
+    ]
+  },
+  "calls": {
+    "github.com/mattermost/mattermost-plugin-calls/server": [
+      "TestAddUserSession",
+      "TestApplyEnvOverrides",
+      "TestConfigurationIsValid",
+      "TestConfigurationWillBeSaved",
+      "TestFieldNameToEnvKey",
+      "TestGetClientConfig",
+      "TestHandleBotGetProfileForSession",
+      "TestHandleBotUploadData",
+      "TestHandleJoin",
+      "TestJobServiceApplyEnvOverrides",
+      "TestMaintainedMostAutoStartRecording",
+      "TestMaintainedMostRecordCallsByDefault",
+      "TestMaintainedMostRecordingDefaults",
+      "TestMaintainedMostRecordingTimeoutStopsOnShutdown",
+      "TestMaintainedMostTranscriberImageRejections",
+      "TestMaintainedMostTranscriberImageRunners",
+      "TestMaintainedMostTranscriberLateJobEnvironment",
+      "TestSetFieldFromEnv",
+      "TestSetOverridesDeprecatedRTCDURL"
+    ],
+    "github.com/mattermost/mattermost-plugin-calls/server/license": [
+      "TestMaintainedMostFeaturesWithoutLicense"
+    ]
+  },
+  "transcriber": {
+    "github.com/mattermost/calls-transcriber/cmd/transcriber/apis/openai": [
+      "TestConfigIsValid",
+      "TestConfigLogValueRedactsAPIKey",
+      "TestMaintainedMostTranscribeBodyCancellation",
+      "TestMaintainedMostTranscribeBodyTimeout",
+      "TestMaintainedMostTranscribeInterruptedBodyRetryLimit",
+      "TestMaintainedMostTranscribeInvalidResponseIsPermanent",
+      "TestMaintainedMostTranscribeRetriesInterruptedBody",
+      "TestMaintainedMostTranscribeSilence",
+      "TestMaintainedMostTranscribeUntrustedStatusIsRedacted",
+      "TestTranscribeAuthFailure",
+      "TestTranscribeChunking",
+      "TestTranscribeEmptySamples",
+      "TestTranscribeNoSegmentsFallback",
+      "TestTranscribeRetriesTransientFailure",
+      "TestTranscribeSuccess",
+      "TestTranscribeTimeout"
+    ],
+    "github.com/mattermost/calls-transcriber/cmd/transcriber/config": [
+      "TestCallTranscriberConfigMap",
+      "TestCallTranscriberConfigToEnv",
+      "TestConfigIsValid",
+      "TestConfigSetDefaults",
+      "TestFromEnv",
+      "TestMaintainedMostOpenAIAPIOptionPrecedence",
+      "TestMaintainedMostOpenAIJobConfigRoundTrip"
+    ]
+  }
+}

@@ -1,8 +1,3 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Documentation
-    url: https://mattermore.dev/docs
-    about: Install steps, configuration, and troubleshooting. Start here.
-  - name: Questions and discussion
-    url: https://github.com/dennisklappe/mattermore/discussions
-    about: Ask how something works, or talk about an idea before opening an issue.
+# The repository README is the overview; no external support service is assumed.
+contact_links: []

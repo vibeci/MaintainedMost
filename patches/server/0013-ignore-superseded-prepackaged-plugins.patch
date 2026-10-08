@@ -7,7 +7,7 @@ index b9792215..437c12c6 100644
  // If enabled, prepackaged plugins are installed or upgraded locally. A list of transitionally
  // prepackaged plugins is also collected for later persistence to the filestore.
 +// skipPrepackagedPlugin reports whether a prepackaged bundle should be ignored
-+// because Mattermore ships its own build of that plugin.
++// because MaintainedMost ships its own build of that plugin.
 +//
 +// The image cannot simply delete the bundle it replaces. The Team Edition base
 +// image has no shell, so there is nothing to run rm with, and COPY merges into

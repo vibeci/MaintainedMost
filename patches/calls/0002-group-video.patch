@@ -20,10 +20,10 @@ index 07ec43a..c847725 100644
  
      connectCall(joinData, clientConfig, (ev) => {
 diff --git a/webapp/src/client.test.ts b/webapp/src/client.test.ts
-index 9241396..2d16bef 100644
+index 9241396..6e54dc3 100644
 --- a/webapp/src/client.test.ts
 +++ b/webapp/src/client.test.ts
-@@ -564,4 +564,178 @@ describe('CallsClient', () => {
+@@ -564,4 +564,259 @@ describe('CallsClient', () => {
              expect(newTrack.stop).toHaveBeenCalledTimes(1);
          });
      });
@@ -32,6 +32,8 @@ index 9241396..2d16bef 100644
 +        const originalMediaStream = global.MediaStream;
 +
 +        beforeEach(() => {
++            jest.useFakeTimers();
++
 +            // jsdom has no MediaStream, and we only ever ask it for its tracks.
 +            // @ts-ignore - minimal stand-in for the test
 +            global.MediaStream = class {
@@ -48,26 +50,27 @@ index 9241396..2d16bef 100644
 +        });
 +
 +        afterEach(() => {
++            client.destroy();
++            jest.useRealTimers();
++
 +            // @ts-ignore - restoring whatever was there (usually undefined)
 +            global.MediaStream = originalMediaStream;
 +        });
 +
-+        const makeTrack = (id: string, readyState = 'live') => ({
-+            id,
-+            kind: 'video',
-+            readyState,
-+            addEventListener: jest.fn(),
-+        } as unknown as MediaStreamTrack);
++        const makeTrack = (id: string, readyState = 'live') => {
++            const track = Object.assign(new EventTarget(), {id, kind: 'video', readyState});
++            jest.spyOn(track, 'addEventListener');
++            jest.spyOn(track, 'removeEventListener');
++            return track as unknown as MediaStreamTrack;
++        };
 +
-+        const makeTransceiver = (mid: string, track: MediaStreamTrack, currentDirection = 'recvonly') => {
++        const makeTransceiver = (mid: string, track: MediaStreamTrack, currentDirection: RTCRtpTransceiverDirection | null = 'recvonly') => {
 +            return {mid, currentDirection, receiver: {track}};
 +        };
 +
-+        // Stands in for the RTCPeer bits we reach into: the peer connection whose
-+        // transceivers carry the tracks and their SFU-assigned IDs.
-+        const setupPeer = (transceivers: unknown[], mediaMap = {}) => {
++        const setupPeer = (transceivers: unknown[], mediaMap: Record<string, {type: string}> = {}) => {
 +            const peer = {
-+                pc: {getTransceivers: () => transceivers, ontrack: null},
++                pc: {getTransceivers: () => transceivers, ontrack: jest.fn() as ((ev: RTCTrackEvent) => void) | null},
 +                mediaMap,
 +            };
 +
@@ -75,6 +78,15 @@ index 9241396..2d16bef 100644
 +            client.peer = peer;
 +
 +            return peer;
++        };
++
++        const receive = (transceiver: ReturnType<typeof makeTransceiver>, sessionID?: string) => {
++            // @ts-ignore - accessing private method for testing
++            client.registerRemoteTrack({
++                track: transceiver.receiver.track,
++                transceiver,
++                streams: sessionID ? [{id: sessionID}] : [],
++            } as unknown as RTCTrackEvent);
 +        };
 +
 +        const sync = () => {
@@ -86,25 +98,27 @@ index 9241396..2d16bef 100644
 +            return (client.emit as jest.Mock).mock.calls.filter((call) => call[0] === event);
 +        };
 +
-+        it('keys a stream by the session ID embedded in the SFU track ID', () => {
-+            setupPeer([makeTransceiver('0', makeTrack('video_sessiona_abcd1234'))]);
-+
-+            sync();
++        it('keys streams by fresh msid rather than immutable track IDs', () => {
++            const transceiver = makeTransceiver('0', makeTrack('video_oldsender_abcd1234'));
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
 +
 +            expect(emitted('remoteVideoStream')).toHaveLength(1);
 +            expect(emitted('remoteVideoStream')[0][2]).toBe('sessiona');
 +            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessiona']);
 +        });
 +
-+        it('re-keys to the new sender when the SFU reuses a transceiver', () => {
-+            const transceiver = makeTransceiver('0', makeTrack('video_sessiona_abcd1234'));
-+            setupPeer([transceiver]);
++        it.each(['video_sessiona_abcd1234', '4b7e2a4c-0f3f-4f4a-9c2e-9b3f1d2a5c11'])('re-keys the SAME receiver track with late metadata (%s)', (id) => {
++            const transceiver = makeTransceiver('0', makeTrack(id));
++            const peer = setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
 +
++            // The browser keeps the receiver track object and its ID unchanged.
++            peer.mediaMap = {};
++            receive(transceiver, 'sessionb');
 +            sync();
-+
-+            // Same mid, new track from a different sender.
-+            transceiver.receiver.track = makeTrack('video_sessionb_efgh5678');
-+
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            peer.mediaMap = {0: {type: 'video'}};
 +            sync();
 +
 +            expect(emitted('remoteVideoStreamRemoved').map((call) => call[1])).toEqual(['sessiona']);
@@ -114,24 +128,32 @@ index 9241396..2d16bef 100644
 +
 +        it('drops a stream once its transceiver stops receiving', () => {
 +            const transceiver = makeTransceiver('0', makeTrack('video_sessiona_abcd1234'));
-+            setupPeer([transceiver]);
-+
-+            sync();
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
 +            transceiver.currentDirection = 'inactive';
 +            sync();
 +
 +            expect(emitted('remoteVideoStreamRemoved').map((call) => call[1])).toEqual(['sessiona']);
 +            expect(client.getRemoteVideoStreams().size).toBe(0);
++
++            // A timer must not invent a stale owner before the new ontrack.
++            transceiver.currentDirection = 'recvonly';
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            receive(transceiver, 'sessionb');
++            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessionb']);
 +        });
 +
-+        it('ignores screen tracks, unparseable IDs and ended tracks', () => {
-+            setupPeer([
++        it('ignores screen tracks, missing msids and ended tracks', () => {
++            const transceivers = [
 +                makeTransceiver('0', makeTrack('screen_sessiona_abcd1234')),
-+                makeTransceiver('1', makeTrack('some-random-track-id')),
++                makeTransceiver('1', makeTrack('video_sessionb_efgh5678')),
 +                makeTransceiver('2', makeTrack('video_sessionc_ijkl9012', 'ended')),
-+            ]);
-+
-+            sync();
++            ];
++            setupPeer(transceivers, {0: {type: 'screen'}, 1: {type: 'video'}, 2: {type: 'video'}});
++            receive(transceivers[0], 'sessiona');
++            receive(transceivers[1]);
++            receive(transceivers[2], 'sessionc');
 +
 +            expect(emitted('remoteVideoStream')).toHaveLength(0);
 +            expect(client.getRemoteVideoStreams().size).toBe(0);
@@ -139,10 +161,10 @@ index 9241396..2d16bef 100644
 +
 +        it('keeps multiple senders apart and does not re-emit unchanged ones', () => {
 +            const transceivers = [makeTransceiver('0', makeTrack('video_sessiona_abcd1234'))];
-+            setupPeer(transceivers);
-+
-+            sync();
++            setupPeer(transceivers, {0: {type: 'video'}, 1: {type: 'video'}});
++            receive(transceivers[0], 'sessiona');
 +            transceivers.push(makeTransceiver('1', makeTrack('video_sessionb_efgh5678')));
++            receive(transceivers[1], 'sessionb');
 +            sync();
 +
 +            expect(emitted('remoteVideoStream').map((call) => call[2])).toEqual(['sessiona', 'sessionb']);
@@ -150,63 +172,122 @@ index 9241396..2d16bef 100644
 +            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessiona', 'sessionb']);
 +        });
 +
-+        it('registers a track from the peer connection track event', () => {
-+            const track = makeTrack('video_sessiona_abcd1234');
-+            setupPeer([makeTransceiver('0', track)]);
++        it('retains a new browser UUID msid when metadata arrives after ontrack', () => {
++            const track = makeTrack('4b7e2a4c-0f3f-4f4a-9c2e-9b3f1d2a5c11');
++            const transceiver = makeTransceiver('1', track);
++            const peer = setupPeer([transceiver]);
++            const original = peer.pc.ontrack;
 +
 +            // @ts-ignore - accessing private method for testing
-+            client.registerRemoteTrack({
++            client.observeRemoteTracks(peer);
++            peer.pc.ontrack?.({
 +                track,
-+                transceiver: {mid: '0'},
++                transceiver,
 +                streams: [{id: 'sessiona'}],
 +            } as unknown as RTCTrackEvent);
++            expect(original).toHaveBeenCalledTimes(1);
++            expect(client.getRemoteVideoStreams().size).toBe(0);
 +
++            peer.mediaMap = {1: {type: 'video'}};
++            jest.advanceTimersByTime(1000);
 +            expect(emitted('remoteVideoStream').map((call) => call[2])).toEqual(['sessiona']);
 +        });
 +
-+        // The SFU recycles the transceiver we opened for our own camera. The
-+        // receiver track on it was created by the browser, so it carries a UUID
-+        // rather than an SFU track name and only the msid identifies the sender.
-+        it('falls back to the msid and the media map when the track ID is a browser UUID', () => {
-+            const track = makeTrack('4b7e2a4c-0f3f-4f4a-9c2e-9b3f1d2a5c11');
-+            setupPeer([makeTransceiver('1', track)], {1: {type: 'video', sender_id: 'ourselves'}});
-+
-+            // @ts-ignore - accessing private method for testing
-+            client.registerRemoteTrack({
-+                track,
-+                transceiver: {mid: '1'},
-+                streams: [{id: 'sessiond'}],
-+            } as unknown as RTCTrackEvent);
-+
-+            expect(emitted('remoteVideoStream').map((call) => call[2])).toEqual(['sessiond']);
-+
-+            // A later sweep must not lose the attribution the track event recorded.
++        it('retains ontrack attribution until negotiation sets currentDirection', () => {
++            const transceiver = makeTransceiver('0', makeTrack('browser-uuid'), null);
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            transceiver.currentDirection = 'recvonly';
 +            sync();
-+            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessiond']);
-+            expect(emitted('remoteVideoStreamRemoved')).toHaveLength(0);
++            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessiona']);
 +        });
 +
 +        it('does not re-emit a stream when the same track fires ontrack twice', () => {
 +            const track = makeTrack('video_sessiona_abcd1234');
-+            setupPeer([makeTransceiver('0', track)]);
-+
-+            const ev = {track, transceiver: {mid: '0'}, streams: [{id: 'sessiona'}]} as unknown as RTCTrackEvent;
-+
-+            // @ts-ignore - accessing private method for testing
-+            client.registerRemoteTrack(ev);
-+            // @ts-ignore - accessing private method for testing
-+            client.registerRemoteTrack(ev);
++            const transceiver = makeTransceiver('0', track);
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
++            receive(transceiver, 'sessiona');
 +
 +            expect(emitted('remoteVideoStream')).toHaveLength(1);
 +            expect(emitted('remoteVideoStreamRemoved')).toHaveLength(0);
++            expect(track.addEventListener).toHaveBeenCalledTimes(1);
++        });
++
++        it('uses current classification when a receiver changes between camera and screen', () => {
++            const transceiver = makeTransceiver('0', makeTrack('video_sessiona_abcd1234'));
++            const peer = setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
++            peer.mediaMap = {0: {type: 'screen'}};
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            peer.mediaMap = {};
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            peer.mediaMap = {0: {type: 'video'}};
++            sync();
++            expect([...client.getRemoteVideoStreams().keys()]).toEqual(['sessiona']);
++        });
++
++        it('does not retain the old owner if a recycled receiver has no msid', () => {
++            const transceiver = makeTransceiver('0', makeTrack('video_sessiona_abcd1234'));
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
++            receive(transceiver);
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            expect(emitted('remoteVideoStream')).toHaveLength(1);
++            expect(emitted('remoteVideoStreamRemoved').map((call) => call[1])).toEqual(['sessiona']);
++        });
++
++        it('removes ended or replaced tracks and their listeners', () => {
++            const track = makeTrack('video_sessiona_abcd1234');
++            const transceiver = makeTransceiver('0', track);
++            setupPeer([transceiver], {0: {type: 'video'}});
++            receive(transceiver, 'sessiona');
++            Object.assign(track, {readyState: 'ended'});
++            track.dispatchEvent(new Event('ended'));
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            expect(track.removeEventListener).toHaveBeenCalledTimes(1);
++
++            const replacement = makeTrack('browser-uuid');
++            transceiver.receiver.track = replacement;
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            receive(transceiver, 'sessionb');
++            transceiver.receiver.track = makeTrack('another-browser-uuid');
++            sync();
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++            expect(replacement.removeEventListener).toHaveBeenCalledTimes(1);
++        });
++
++        it('cleans up its timer, track listeners, handler and stream maps on destroy', () => {
++            const track = makeTrack('browser-uuid');
++            const transceiver = makeTransceiver('0', track);
++            const peer = setupPeer([transceiver], {0: {type: 'video'}});
++            const original = peer.pc.ontrack;
++
++            // @ts-ignore - accessing private method for testing
++            client.observeRemoteTracks(peer);
++            receive(transceiver, 'sessiona');
++            expect(jest.getTimerCount()).toBe(1);
++            client.destroy();
++            expect(jest.getTimerCount()).toBe(0);
++            expect(peer.pc.ontrack).toBe(original);
++            expect(track.removeEventListener).toHaveBeenCalledTimes(1);
++            expect(client.getRemoteVideoStreams().size).toBe(0);
++
++            // @ts-ignore - accessing private property for testing
++            expect(client.remoteTracksByMid.size).toBe(0);
 +        });
 +    });
  });
 diff --git a/webapp/src/client.ts b/webapp/src/client.ts
-index d987eae..1e80949 100644
+index d987eae..a5bc442 100644
 --- a/webapp/src/client.ts
 +++ b/webapp/src/client.ts
-@@ -49,6 +49,45 @@ export const DefaultVideoTrackOptions: MediaTrackConstraints = {
+@@ -49,6 +49,27 @@ export const DefaultVideoTrackOptions: MediaTrackConstraints = {
  
  const rtcMonitorInterval = 10000;
  
@@ -215,44 +296,26 @@ index d987eae..1e80949 100644
 +// up in the connection state, so we sweep periodically as well.
 +const remoteTracksSyncInterval = 1000;
 +
-+// The SFU names every track it forwards `<type>_<sender session ID>_<random>`
-+// and uses the sender's session ID as the stream (msid) ID. See
-+// rtcd service/rtc/utils.go genTrackID and sfu.go NewTrackLocalStaticRTP.
-+//
-+// Those two are the only trustworthy attribution we get. The MediaMap data
-+// channel message looks like it should serve, but rtcd fills its sender_id field
-+// with `s.cfg.SessionID`, which is the *receiving* session
-+// (service/rtc/session.go sendMediaMapping). Reading it makes every remote track
-+// look like it came from ourselves, so all of them collapse onto one key. Its
-+// `type` field is sound, and is the only place a track type is stated once the
-+// track ID goes stale.
-+const parseRemoteTrackID = (trackID: string) => {
-+    const fields = trackID.split('_');
-+    if (fields.length !== 3 || !fields[0] || !fields[1]) {
-+        return null;
-+    }
-+    return {type: fields[0], sessionID: fields[1]};
-+};
-+
-+// Internals of RTCPeer we need to reach into: the peer connection, so we can
-+// observe transceivers and wrap the track handler, and the media map, whose
-+// `type` field is sound even though its `sender_id` is not.
++// The SFU uses the sender's session ID as the msid (rtc/sfu.go). Browser
++// track IDs stay fixed when a receiver is recycled, and rtcd's MediaMap
++// sender_id incorrectly names the receiver (rtc/session.go sendMediaMapping).
++// Only ontrack's fresh msid and the current MediaMap type are used below.
 +type RTCPeerInternals = {
 +    pc: RTCPeerConnection | null;
-+    mediaMap: {[mid: string]: {type: string, sender_id: string}};
++    mediaMap: {[mid: string]: {type: string}};
 +};
 +
 +type RemoteTrackRecord = {
-+    type: string;
 +    sessionID: string;
 +    track: MediaStreamTrack;
 +    stream: MediaStream;
++    receiving: boolean;
 +};
 +
  export default class CallsClient extends EventEmitter {
      public channelID: string;
      private readonly config: CallsClientConfig;
-@@ -58,7 +97,17 @@ export default class CallsClient extends EventEmitter {
+@@ -58,7 +79,16 @@ export default class CallsClient extends EventEmitter {
      public localVideoStream: MediaStream | null = null;
      private remoteScreenTrack: MediaStreamTrack | null = null;
      private remoteVoiceTracks: MediaStreamTrack[];
@@ -263,15 +326,14 @@ index d987eae..1e80949 100644
 +    // is refreshed on every track event.
 +    private remoteTracksByMid: Map<string, RemoteTrackRecord>;
 +
-+    // Remote camera streams keyed by the session ID of the sender, derived from
-+    // the track IDs the SFU assigns.
++    // Remote camera streams keyed by the sender's session ID from the msid.
 +    private remoteVideoStreams: Map<string, MediaStream>;
 +
-+    private remoteTracksSyncID: ReturnType<typeof setInterval> | null = null;
++    private stopObservingRemoteTracks: (() => void) | null = null;
      public currentAudioInputDevice: MediaDeviceInfo | null = null;
      public currentAudioOutputDevice: MediaDeviceInfo | null = null;
      public currentVideoInputDevice: MediaDeviceInfo | null = null;
-@@ -101,7 +150,8 @@ export default class CallsClient extends EventEmitter {
+@@ -101,7 +131,8 @@ export default class CallsClient extends EventEmitter {
          this.videoSenderTrackID = '';
          this.streams = [];
          this.remoteVoiceTracks = [];
@@ -281,7 +343,7 @@ index d987eae..1e80949 100644
          this.stream = null;
          this.audioDevices = {inputs: [], outputs: []};
          this.videoDevices = [];
-@@ -542,6 +592,8 @@ export default class CallsClient extends EventEmitter {
+@@ -542,6 +573,8 @@ export default class CallsClient extends EventEmitter {
  
              this.peer = peer;
  
@@ -290,7 +352,7 @@ index d987eae..1e80949 100644
              this.collectICEStats();
  
              this.rtcMonitor = new RTCMonitor({
-@@ -615,9 +667,11 @@ export default class CallsClient extends EventEmitter {
+@@ -615,9 +648,11 @@ export default class CallsClient extends EventEmitter {
                  // Handle video tracks based on type
                  if (videoTracks.length > 0) {
                      if (trackInfo?.type === 'video') {
@@ -305,7 +367,7 @@ index d987eae..1e80949 100644
                      } else if (trackInfo?.type === 'screen') {
                          logDebug('received screen track, emitting as remoteScreenStream');
                          this.emit('remoteScreenStream', remoteStream);
-@@ -667,6 +721,8 @@ export default class CallsClient extends EventEmitter {
+@@ -667,6 +702,8 @@ export default class CallsClient extends EventEmitter {
          this.removeAllListeners('connect');
          this.removeAllListeners('remoteVoiceStream');
          this.removeAllListeners('remoteScreenStream');
@@ -314,20 +376,21 @@ index d987eae..1e80949 100644
          this.removeAllListeners('localScreenStream');
          this.removeAllListeners('localVideoStream');
          this.removeAllListeners('devicechange');
-@@ -683,6 +739,12 @@ export default class CallsClient extends EventEmitter {
+@@ -683,6 +720,13 @@ export default class CallsClient extends EventEmitter {
          this.removeAllListeners('video_off');
          window.removeEventListener('beforeunload', this.onBeforeUnload);
          navigator.mediaDevices?.removeEventListener('devicechange', this.onDeviceChange);
-+        if (this.remoteTracksSyncID) {
-+            clearInterval(this.remoteTracksSyncID);
-+            this.remoteTracksSyncID = null;
++        this.stopObservingRemoteTracks?.();
++        this.stopObservingRemoteTracks = null;
++        for (const record of this.remoteTracksByMid.values()) {
++            record.track.removeEventListener('ended', this.syncRemoteVideoStreams);
 +        }
 +        this.remoteVideoStreams.clear();
 +        this.remoteTracksByMid.clear();
          this.segmenter?.stop();
          this.segmenter = null;
          persistClientLogs();
-@@ -958,11 +1020,146 @@ export default class CallsClient extends EventEmitter {
+@@ -958,13 +1002,136 @@ export default class CallsClient extends EventEmitter {
          return new MediaStream([this.remoteScreenTrack]);
      }
  
@@ -342,6 +405,8 @@ index d987eae..1e80949 100644
 +    // transceiver, the track and the msid are all available at once. We wrap the
 +    // handler rather than replace it so RTCPeer keeps emitting 'stream' as usual.
 +    private observeRemoteTracks(peer: RTCPeer) {
++        this.stopObservingRemoteTracks?.();
++        this.stopObservingRemoteTracks = null;
 +        const pc = (peer as unknown as RTCPeerInternals).pc;
 +        if (!pc) {
 +            logErr('client: no peer connection to observe remote tracks on');
@@ -349,7 +414,7 @@ index d987eae..1e80949 100644
 +        }
 +
 +        const original = pc.ontrack;
-+        pc.ontrack = (ev: RTCTrackEvent) => {
++        const onTrack = (ev: RTCTrackEvent) => {
 +            try {
 +                this.registerRemoteTrack(ev);
 +            } catch (err) {
@@ -357,14 +422,25 @@ index d987eae..1e80949 100644
 +            }
 +            original?.call(pc, ev);
 +        };
++        pc.ontrack = onTrack;
 +
 +        // A sender leaving flips its transceiver to inactive without firing a track
 +        // event, so we sweep as well as react.
-+        this.remoteTracksSyncID = setInterval(() => this.syncRemoteVideoStreams(), remoteTracksSyncInterval);
++        const interval = setInterval(this.syncRemoteVideoStreams, remoteTracksSyncInterval);
++        this.stopObservingRemoteTracks = () => {
++            clearInterval(interval);
++            if (pc.ontrack === onTrack) {
++                pc.ontrack = original;
++            }
++        };
 +    }
 +
 +    private registerRemoteTrack(ev: RTCTrackEvent) {
 +        const {track, transceiver} = ev;
++        if (track.kind !== 'video') {
++            return;
+         }
+-        return new MediaStream([this.remoteVideoTracks[this.remoteVideoTracks.length - 1]]);
 +        const mid = transceiver?.mid;
 +        if (!mid) {
 +            logWarn('client: remote track with no mid', track.id);
@@ -372,26 +448,19 @@ index d987eae..1e80949 100644
 +        }
 +
 +        // The msid is re-read from the SDP on every negotiation, so it is the
-+        // freshest statement of who owns this track. The track ID is fixed when the
-+        // browser creates the receiver track and goes stale as soon as the SFU
-+        // recycles the transceiver for another sender, so it is only a fallback.
-+        // It is also a browser-generated UUID, carrying nothing, on the transceiver
-+        // we opened for our own camera and the SFU then recycled.
-+        const parsed = parseRemoteTrackID(track.id);
-+        const mediaMap = (this.peer as unknown as RTCPeerInternals | null)?.mediaMap;
-+        const sessionID = ev.streams[0]?.id || parsed?.sessionID || '';
-+        const type = mediaMap?.[mid]?.type || parsed?.type || '';
++        // freshest statement of who owns this track. An immutable receiver track
++        // ID cannot identify its owner after the SFU recycles the transceiver.
++        const existing = this.remoteTracksByMid.get(mid);
++        const sessionID = ev.streams[0]?.id || '';
 +
-+        if (!sessionID || !type) {
-+            logWarn('client: unable to attribute remote track', track.id, 'mid', mid, 'msid', ev.streams[0]?.id);
-+            return;
++        if (existing?.track !== track) {
++            existing?.track.removeEventListener('ended', this.syncRemoteVideoStreams);
++            track.addEventListener('ended', this.syncRemoteVideoStreams);
 +        }
 +
-+        logDebug('client: remote track', track.id, 'mid', mid, 'msid', ev.streams[0]?.id, 'type', type, 'sender', sessionID);
-+
-+        const existing = this.remoteTracksByMid.get(mid);
++        // MediaMap can arrive after ontrack. Save the fresh msid even without a
++        // type, and never fall back to the previous owner of a recycled receiver.
 +        this.remoteTracksByMid.set(mid, {
-+            type,
 +            sessionID,
 +
 +            // Keep the stream object while both the track and its owner are
@@ -399,21 +468,16 @@ index d987eae..1e80949 100644
 +            // its video element down and build it again.
 +            stream: existing?.track === track && existing.sessionID === sessionID ? existing.stream : new MediaStream([track]),
 +            track,
++            receiving: false,
 +        });
 +
-+        if (existing?.track !== track) {
-+            for (const event of ['ended', 'mute', 'unmute']) {
-+                track.addEventListener(event, () => this.syncRemoteVideoStreams());
-+            }
-+        }
-+
 +        this.syncRemoteVideoStreams();
-+    }
-+
+     }
+ 
 +    // Recomputes the session ID -> stream mapping from the live transceivers and
 +    // emits the difference. A sender swapping onto a recycled transceiver is
 +    // handled like any other change since everything is keyed by mid.
-+    private syncRemoteVideoStreams() {
++    private syncRemoteVideoStreams = () => {
 +        const internals = this.peer as unknown as RTCPeerInternals | null;
 +        const pc = internals?.pc;
 +        if (!pc) {
@@ -421,41 +485,29 @@ index d987eae..1e80949 100644
 +        }
 +
 +        const streams = new Map<string, MediaStream>();
-+        for (const transceiver of pc.getTransceivers()) {
-+            const {mid, currentDirection} = transceiver;
-+            if (!mid || (currentDirection !== 'sendrecv' && currentDirection !== 'recvonly')) {
++        const transceivers = new Map(pc.getTransceivers().map((transceiver) => [transceiver.mid, transceiver]));
++        for (const [mid, record] of this.remoteTracksByMid) {
++            const transceiver = transceivers.get(mid);
++            const receiving = transceiver?.currentDirection === 'sendrecv' || transceiver?.currentDirection === 'recvonly';
++
++            // A new ontrack may precede the answer that sets currentDirection.
++            // Retire an inactive receiver only after it has actually received.
++            if (!transceiver || transceiver.receiver.track !== record.track || record.track.readyState === 'ended' || (!receiving && record.receiving)) {
++                record.track.removeEventListener('ended', this.syncRemoteVideoStreams);
++                this.remoteTracksByMid.delete(mid);
 +                continue;
 +            }
 +
-+            const track = transceiver.receiver?.track;
-+            if (!track || track.kind !== 'video' || track.readyState === 'ended') {
++            if (!receiving) {
 +                continue;
 +            }
++            record.receiving = true;
 +
-+            // Attribution is decided in the track handler, which is the only place
-+            // with the msid. The parsed track ID stands in should a track ever reach
-+            // a transceiver without one.
-+            const record = this.remoteTracksByMid.get(mid);
-+            const parsed = parseRemoteTrackID(track.id);
-+            const sessionID = record?.track === track ? record.sessionID : parsed?.sessionID;
-+            if (!sessionID) {
-+                continue;
++            // Only the current media map can classify a recycled receiver. Its
++            // immutable track ID and any cached type may describe an old sender.
++            if (record.sessionID && internals?.mediaMap?.[mid]?.type === 'video') {
++                streams.set(record.sessionID, record.stream);
 +            }
-+
-+            // The type can change under a recycled mid (camera out, screen in), and
-+            // the media map is where that shows up.
-+            const type = internals?.mediaMap?.[mid]?.type || record?.type || parsed?.type;
-+            if (type !== 'video') {
-+                continue;
-+            }
-+
-+            let stream = record?.stream;
-+            if (!record || record.track !== track || record.sessionID !== sessionID) {
-+                stream = new MediaStream([track]);
-+                this.remoteTracksByMid.set(mid, {type, sessionID, track, stream});
-+            }
-+
-+            streams.set(sessionID, stream!);
 +        }
 +
 +        for (const [sessionID, stream] of this.remoteVideoStreams) {
@@ -473,11 +525,12 @@ index d987eae..1e80949 100644
 +            logDebug('client: emitting remote video stream for session', sessionID);
 +            this.remoteVideoStreams.set(sessionID, stream);
 +            this.emit('remoteVideoStream', stream, sessionID);
-         }
--        return new MediaStream([this.remoteVideoTracks[this.remoteVideoTracks.length - 1]]);
-     }
- 
++        }
++    };
++
      public getRemoteVoiceTracks(): MediaStreamTrack[] {
+         const tracks = [];
+         for (const track of this.remoteVoiceTracks) {
 diff --git a/webapp/src/components/call_widget/component.test.tsx b/webapp/src/components/call_widget/component.test.tsx
 index 7d8446d..d3386b8 100644
 --- a/webapp/src/components/call_widget/component.test.tsx

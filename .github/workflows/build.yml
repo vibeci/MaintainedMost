@@ -1,67 +1,134 @@
-# Builds what a release would build, on every pull request.
-#
-# Two releases shipped broken because compilation only happened on a tag: a
-# patch that did not compile, and a default that never applied. Both would have
-# failed here, before merge, which is the point.
-name: build
+# The same test/build gate is used for PRs, main, and releases.
+name: MaintainedMost Build
 
 on:
   pull_request:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      image-tag:
+        type: string
+        default: maintainedmost:ci
+      export-images:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  patches:
-    name: patches apply
+  infrastructure:
+    name: MaintainedMost infrastructure tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - id: upstream
-        run: grep -E '^[A-Z_]+=' upstream.env >> "$GITHUB_OUTPUT"
-
-      - name: Server patches apply to the pinned tag
-        run: |
-          git clone --quiet --depth 1 --branch "${{ steps.upstream.outputs.SERVER_TAG }}" \
-            --filter=blob:none https://github.com/mattermost/mattermost.git /tmp/server
-          for p in patches/server/*.patch; do
-            git -C /tmp/server apply "$PWD/$p" || { echo "::error::$p does not apply"; exit 1; }
-            echo "applied $(basename "$p")"
-          done
-
-      - name: Calls patches apply to the pinned tag
-        run: |
-          git clone --quiet --depth 1 --branch "${{ steps.upstream.outputs.CALLS_TAG }}" \
-            https://github.com/mattermost/mattermost-plugin-calls.git /tmp/calls
-          for p in patches/calls/*.patch; do
-            git -C /tmp/calls apply "$PWD/$p" || { echo "::error::$p does not apply"; exit 1; }
-            echo "applied $(basename "$p")"
-          done
-
-  plugin:
-    name: calls plugin compiles
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
-      - uses: actions/setup-go@v5
-        with: { go-version: '1.26' }
-      - run: ./scripts/build-calls.sh dist
+        with: { node-version: '24' }
+      - name: Infrastructure regressions and syntax
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+          node --test scripts/tests/*.test.cjs
+          for script in scripts/*.sh; do bash -n "$script"; done
+          shellcheck -x -P SCRIPTDIR scripts/lib.sh scripts/build-{server,calls,transcriber,image}.sh scripts/test-{component,offloader}.sh scripts/check-upstream.sh scripts/check-public-images.sh
+          source upstream.env
+          export GOTOOLCHAIN="go$GO_VERSION"
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+          MAINTAINEDMOST_IMAGE=maintainedmost:ci CALLS_IMAGE_REGISTRY=maintainedmost SITE_URL=http://localhost POSTGRES_PASSWORD=ci-only docker compose config --quiet
+          export VIBECI_IMAGE="example.invalid/vibeci@sha256:$(printf '0%.0s' {1..64})"
+          VIBECI_SANDBOX_IMAGE="$VIBECI_IMAGE" VIBECI_RUN_DIR="$RUNNER_TEMP/maintenance-config" docker compose -f maintenance/compose.yaml config --quiet
+      - name: Real offloader image and environment contract
+        run: ./scripts/test-offloader.sh
 
-  server:
-    name: server compiles
+  images:
+    name: MaintainedMost complete image build
+    needs: infrastructure
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Calls' upstream testcontainers helper provisions its own PostgreSQL.
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: pins
+        run: |
+          source upstream.env
+          echo "go=$GO_VERSION" >> "$GITHUB_OUTPUT"
+          echo "node=$NODE_VERSION" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.pins.outputs.node }}
       - uses: actions/setup-go@v5
-        with: { go-version: '1.26' }
-      - name: Build the server binary
-        # The web app is four minutes and is not what breaks: a release builds
-        # it, this proves the Go side and the patch series compile.
+        with:
+          go-version: ${{ steps.pins.outputs.go }}
+          cache: false
+      - name: Test and build server, webapp, Calls and both job images
         env:
-          SKIP_WEBAPP: '1'
-        run: ./scripts/build-server.sh /tmp/mattermore-server
+          CONTAINER_ENGINE: docker
+          RUN_TESTS: '1'
+          IMAGE_TAG: ${{ inputs.image-tag || 'maintainedmost:ci' }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: ./scripts/build-image.sh "$IMAGE_TAG"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maintainedmost-go-test-results
+          path: build/test-results/*.jsonl
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maintainedmost-calls-plugin
+          path: build/image/plugin/*
+          if-no-files-found: error
+      - name: Export tested images for publication without rebuilding
+        if: inputs.export-images
+        env:
+          IMAGE_TAG: ${{ inputs.image-tag }}
+        run: |
+          ROOT="$PWD"
+          source "$ROOT/upstream.env"
+          source "$ROOT/scripts/lib.sh"
+          job_images "$IMAGE_TAG"
+          docker save "$IMAGE_TAG" "$TRANSCRIBER_IMAGE" "$RECORDER_IMAGE" -o "$RUNNER_TEMP/maintainedmost-images.tar"
+      - uses: actions/upload-artifact@v4
+        if: inputs.export-images
+        with:
+          name: maintainedmost-release-images
+          path: ${{ runner.temp }}/maintainedmost-images.tar
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+  regression-gate:
+    name: MaintainedMost regression tests and complete images
+    needs: [infrastructure, images]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require successful producers
+        env:
+          INFRASTRUCTURE_RESULT: ${{ needs.infrastructure.result }}
+          BUILD_RESULT: ${{ needs.images.result }}
+        run: |
+          test "$INFRASTRUCTURE_RESULT" = success
+          test "$BUILD_RESULT" = success
+      # Upstream build/lifecycle scripts never execute in this job. In PRs, the
+      # checker and inventory come from the protected base, not the proposal.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+          path: policy
+      - uses: actions/download-artifact@v4
+        with:
+          name: maintainedmost-go-test-results
+          path: ${{ runner.temp }}/maintainedmost-go-test-results
+      - name: Independently verify every required Go result
+        env:
+          REPORT_DIR: ${{ runner.temp }}/maintainedmost-go-test-results
+        run: python3 -I -B policy/scripts/check-ci-test-reports.py "$REPORT_DIR"

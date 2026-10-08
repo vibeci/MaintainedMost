@@ -1,130 +1,144 @@
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dennisklappe/mattermore/main/site/public/logo-wide-dark.svg">
-    <img src="https://raw.githubusercontent.com/dennisklappe/mattermore/main/site/public/logo-wide.svg" alt="Mattermore" width="320">
-  </picture>
+# MaintainedMost
 
-  <p><strong>Mattermost, but more.</strong></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/wordmark-white.svg">
+  <img src="brand/wordmark-dark.svg" alt="MaintainedMost" width="480">
+</picture>
 
-  <p>
-    <a href="LICENSE"><img alt="Licence AGPL-3.0" src="https://img.shields.io/badge/licence-AGPL--3.0-0a7452.svg"></a>
-    <a href="https://github.com/dennisklappe/mattermore/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/dennisklappe/mattermore?sort=semver"></a>
-    <a href="https://github.com/dennisklappe/mattermore/actions"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/dennisklappe/mattermore/release.yml"></a>
-  </p>
+**Mattermost, with the follow-through.**
 
-  <p>A fork of <a href="https://github.com/mattermost/mattermost">Mattermost</a> that turns the paywalled features back on.</p>
+A patch-based fork of [Mattermost](https://github.com/mattermost/mattermost)
+for self-hosted collaboration, building on the original Mattermore patch set.
+The aim is straightforward: keep the useful features, fix the rough edges, and
+make upstream updates routine. A promising first release is a good start;
+we would quite like there to be a second act.
 
-  <p>
-    <a href="https://mattermore.dev">Website</a> &nbsp;·&nbsp;
-    <a href="https://mattermore.dev/docs">Docs</a> &nbsp;·&nbsp;
-    <a href="https://mattermore.dev/install">Install</a> &nbsp;·&nbsp;
-    <a href="https://github.com/dennisklappe/mattermore/releases">Releases</a>
-  </p>
-</div>
+The code, documentation, issues and release history live in this repository.
+There is no separate website or hosted-service offering.
 
----
+## What It Does
 
-## What is "more"?
-
-| On a self-hosted server, no paid licence | Mattermost free | Mattermore |
+| Capability | MaintainedMost | Requirements or limits |
 | --- | --- | --- |
-| One-to-one audio calls, screen sharing | Yes | Yes |
-| Group audio calls in any channel | Needs Professional | Yes |
-| Group video calls | Direct messages only | Yes |
-| Call recording | Needs Enterprise | Yes |
-| Transcription, on your own hardware | Needs Enterprise | Yes |
-| Single sign-on with any OIDC provider | Needs Professional | Yes |
-| Guest accounts | Needs Professional | Yes |
-| Users on one server | 250, by licence | Whatever your hardware handles |
-| Message history | 10,000 on Entry | All of it |
+| Audio calls and screen sharing | One-to-one and group calls | Calls plugin and reachable media ports |
+| Group camera video | Experimental | Client regression tests, not complete live-browser verification |
+| Recording | No paid licence check | Offloader and recorder; captures voice and shared screen, not group cameras |
+| Transcription | Local Whisper by default | Patched transcriber; remote APIs are opt-in |
+| OIDC single sign-on | Generic provider | Discovery, validated token claims and verified UserInfo |
+| Guest accounts and channel moderation | Licence gates removed | Administrator settings and permissions still apply |
+| User limits | 200,000 soft / 250,000 hard | A raised limit, not a capacity guarantee |
+| Message history | No licence-based history cap | Inherited from unlicensed Team Edition |
+
+LDAP, SAML and other private enterprise implementations are not supplied.
+Removing a menu's licence check does not make its missing backend appear.
 
 ## Install
 
-Run the image and everything above is already on:
+For a full server, follow [self-hosting](docs/selfhost.md). For just Calls on
+an existing compatible Mattermost server, follow [plugin installation](docs/install.md).
+
+The Compose stack requires a tested server image and its matching job-image
+namespace in `.env`, alongside the site URL and database password:
+
+```ini
+MAINTAINEDMOST_IMAGE=ghcr.io/OWNER/maintainedmost:v1.5.0
+CALLS_IMAGE_REGISTRY=ghcr.io/OWNER/maintainedmost
+```
+
+`OWNER` and `v1.5.0` illustrate the naming scheme, not an already published
+release. Both `calls-recorder:<upstream-version>` and
+`calls-transcriber:<release-tag>` must exist in that namespace. Choose a
+completed release or build the pinned source; do not assume an older image
+contains the current fixes.
+
+**Existing installations:** read [upgrading](docs/upgrading.md) first. Keep your
+old `COMPOSE_PROJECT_NAME` when reusing existing volumes. OIDC now requires
+discovery and boolean `email_verified: true` in UserInfo; test a local
+administrator recovery account before migrating SSO.
+
+The offloader's Docker socket grants host-level privileges. Keep its API
+private. Recording and transcription still require ready services, matching
+images and sufficient resources. Explicit opt-outs are honored; automatic
+recording is off by default.
+
+## Maintenance Approach
+
+- Ordered patches against pinned upstream commits, with a matching server
+  runtime-image digest. A conflicting patch fails the build; it is not quietly
+  omitted from the release.
+- Upstream monitoring distinguishes a patch conflict from a failed checkout
+  and checks plugin minimum-server requirements before suggesting an upgrade.
+- Opt-in [VibeCI maintenance](docs/maintenance.md) ports all three patch sets as
+  one pinned transaction, with protected CI before any automatic merge.
+- Race-enabled Go regressions, the full OIDC provider suite, Calls webapp tests,
+  native build checks and complete production builds gate releases.
+- Releases reuse the tested artifacts and check anonymous access to the job
+  images before promoting the server image or publishing the release.
+- Known limitations and migration requirements stay in the documentation.
+
+A green badge is reassuring. We prefer it to mean the tests ran, rather than
+that the patch files were successfully located.
+
+[`upstream.env`](upstream.env) is authoritative. The current baseline is server
+**11.11.1**, Calls source **1.12.3** with bundle **1000.12.4**, and transcriber
+commit **c09a9a3**. Calls 1.12.5 requires server 12 and is not a compatible
+independent upgrade.
+
+## Build
+
+Use the Go and Node versions in `upstream.env`, plus Git, Make, Python 3 and
+Docker with Buildx. Frontend builds retain upstream's locked dependencies.
 
 ```bash
-docker run -d --name mattermost \
-  -e MM_SQLSETTINGS_DRIVERNAME=postgres \
-  -e MM_SQLSETTINGS_DATASOURCE="postgres://..." \
-  -e MM_SERVICESETTINGS_SITEURL="https://chat.example.com" \
-  -p 8065:8065 -p 8443:8443/udp -p 8443:8443/tcp \
-  ghcr.io/dennisklappe/mattermore:latest
+RUN_TESTS=1 ./scripts/build-calls.sh
+RUN_TESTS=1 ./scripts/build-server.sh
+RUN_TESTS=1 ./scripts/build-image.sh maintainedmost:dev
 ```
 
-Already running Mattermost and would rather not replace it? Set
-`MM_CALLS_GROUP_CALLS_ALLOWED=true` and upload the calls plugin from
-[Releases](https://github.com/dennisklappe/mattermore/releases). That covers
-everything call-related and takes two minutes.
-
-Full instructions: [mattermore.dev/install](https://mattermore.dev/install).
-
-## How it works
-
-Three mechanisms, all documented rather than hidden.
-
-**Upstream ships some of the switches itself.** Group calls are gated by one
-function that also reads an environment variable Mattermost added:
-
-```go
-func (e *LicenseChecker) GroupCallsAllowed() bool {
-    return e.isAtLeastProfessionalLicensed() ||
-        os.Getenv("MM_CALLS_GROUP_CALLS_ALLOWED") == "true"
-}
-```
-
-**Where nothing exists, we write it.** Single sign-on was not a check to
-remove: Mattermost keeps its OpenID Connect provider in a private module, so
-Team Edition has no implementation and answers logins with a 501. So Mattermore
-contributes one, implementing Mattermost's own four-method interface. It is our
-code, under the AGPL, with discovery, standard claims, enforced https and
-identity taken from the userinfo response rather than an unverified token.
-
-**Patches, not a diverged branch.** Every change is a patch file applied to a
-pinned upstream tag, one per restriction. Picking up an upstream security fix
-means bumping one line in `upstream.env`. If a patch stops applying on a new
-release it is dropped for that release and everything else still ships.
-
-## Licensing
-
-AGPL-3.0, the same licence as the code this builds on.
-
-Mattermore changes AGPL code only. It does not modify anything under the
-Mattermost Source Available Licence, and it goes further than that: upstream's
-`server/enterprise` package is compiled into the calls plugin, so a bundle
-built from an unmodified tree would redistribute Source Available code.
-`patches/calls/0001` replaces it with an independent AGPL implementation, so it
-is no longer in the dependency graph at all.
-
-```
-go list -deps ./server/ | grep -c server/enterprise   # 0
-```
-
-Some restrictions are deliberately left alone. LDAP, SAML and the dedicated
-Google and Office365 providers are gated in AGPL code, but their
-implementations live in Mattermost's private module. Removing those checks
-would produce a menu item that fails at runtime, not a working feature.
-
-See [NOTICE.md](NOTICE.md) and
-[mattermore.dev/licensing](https://mattermore.dev/licensing).
-
-## Building it yourself
-
-Needs Go, Node 20+, and podman or docker.
+The full server image currently targets **Linux/amd64**. The standalone
+transcriber also supports a native ARM build:
 
 ```bash
-./scripts/build-calls.sh     # the plugin bundle
-./scripts/build-server.sh    # the server binary
-./scripts/build-image.sh     # both, as a container image
+TARGETARCH=arm64 RUN_TESTS=1 GOFLAGS=-p=2 ./scripts/build-transcriber.sh
 ```
 
-`upstream.env` pins every upstream tag. `patches/README.md` explains the
-series and the rules they follow.
+Its native **Linux/arm64** image has passed offline Whisper inference,
+Silero/ONNX speech detection and Opus decoding with the real runtime libraries.
+That is evidence for the transcriber, not a claim that the entire server stack
+has been validated on ARM. The earlier amd64 build failed under local QEMU
+emulation; native amd64 verification remains separate. See
+[architecture verification](docs/transcription.md#architecture-verification).
 
-## Be fair to Mattermost
+Live-browser media, real identity providers and complete recording jobs still
+need deployment testing. There is no support SLA or promise of compatibility
+with arbitrary upstream versions.
 
-They wrote this software and open sourced it. If your organisation can afford
-Professional, buying it funds the upstream work that makes a fork like this
-possible at all.
+## Documentation
 
-Not affiliated with, endorsed by, or supported by Mattermost, Inc.
-"Mattermost" is their trademark, used here only to describe compatibility.
+- [Operator guide](docs/README.md)
+- [Configuration](docs/configuration.md) and [single sign-on](docs/sso.md)
+- [Recording](docs/recording.md) and [transcription](docs/transcription.md)
+- [Upgrading and rollback](docs/upgrading.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Contributing and publishing](CONTRIBUTING.md)
+- [Automated maintenance setup](docs/maintenance.md)
+- [Security reporting](SECURITY.md)
+
+## Licence And Credits
+
+GNU AGPLv3 for this project, with upstream component licences and notices
+preserved. Both the pinned Mattermost server and Calls source explicitly grant
+GNU AGPLv3; the conflicting AGPLv2 wording in Mattermost's FAQ is documented in
+[the licensing notes](docs/licensing.md#why-agplv3).
+
+This is not a claim that every container dependency is AGPL-only. Read
+[LICENSE](LICENSE), [NOTICE.md](NOTICE.md) and the [distribution caveats](docs/licensing.md)
+before redistributing artifacts.
+
+Mattermost and its contributors built the software this project depends on.
+Dennis Klappe and the Mattermore contributors supplied the original fork's
+patches. Their attribution remains intact. If a commercial Mattermost
+subscription suits your organisation, it also funds the upstream work.
+
+MaintainedMost is not affiliated with, endorsed by, or supported by Mattermost,
+Inc. "Mattermost" is their trademark, used here to describe compatibility.

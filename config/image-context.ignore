@@ -1,0 +1,17 @@
+*
+!Containerfile
+!maintainedmost-server
+!maintainedmost-calls.tar.gz
+!client/
+!client/**
+!config/
+config/**
+!config/overrides.json
+!scripts/
+scripts/**
+!scripts/merge-config.py
+**/.env
+**/.env.*
+**/.envrc
+**/.secrets
+**/secrets

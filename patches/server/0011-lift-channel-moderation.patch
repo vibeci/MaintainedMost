@@ -7,7 +7,7 @@ index 84d569e1..c2916340 100644
  }
  
 +// Channel moderation is permission bookkeeping the server already does for
-+// every channel, so Mattermore does not ask for a licence before showing it.
++// every channel, so MaintainedMost does not ask for a licence before showing it.
  func getChannelModerations(c *Context, w http.ResponseWriter, r *http.Request) {
 -	if c.App.Channels().License() == nil {
 -		c.Err = model.NewAppError("Api4.GetChannelModerations", "api.channel.get_channel_moderations.license.error", nil, "", http.StatusForbidden)
@@ -48,7 +48,7 @@ index f8e3c334..ab2ecfdf 100644
  
 -    // Channel Moderation is only available for Professional and above
 -    const channelModerationEnabled = isLicensed && isMinimumProfessionalLicense(license);
-+    // Mattermore lifts the licence gate on channel moderation, so the panel is
++    // MaintainedMost lifts the licence gate on channel moderation, so the panel is
 +    // always shown. The server no longer refuses the calls behind it either.
 +    const channelModerationEnabled = true;
  

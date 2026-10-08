@@ -1,20 +1,21 @@
-# Mattermore, with everything the advertised features need.
+# MaintainedMost, with everything the advertised features need.
 #
-#   cp .env.example .env   # set the two passwords
+#   cp .env.example .env   # set the image, job registry, URL and password
 #   docker compose up -d
 #
-# Calls, group video, recording and transcription all work after this with no
-# System Console visit. Recording spawns a container per job, which is why the
-# job service gets the Docker socket. If you would rather not grant that, drop
-# the calls-offloader service: everything else keeps working and the record
-# button simply does not appear.
+# Recording and transcription need reachable, compatible job images and a ready
+# offloader. Its Docker socket grants host-level privileges. To omit that
+# service, also remove MM_CALLS_JOB_SERVICE_URL and explicitly disable recording
+# and transcription. Test media connectivity before relying on this deployment.
 
-# Pinned so the job containers can be told which network to join.
-name: mattermore
+# The offloader must use the same project name as Compose. Existing Mattermore
+# deployments MUST set COMPOSE_PROJECT_NAME to their old name before `up`, or
+# Compose will create new empty volumes. Keep the volume keys below unchanged.
+name: ${COMPOSE_PROJECT_NAME:-maintainedmost}
 
 services:
   postgres:
-    image: docker.io/library/postgres:17-alpine
+    image: docker.io/library/postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
     environment:
       POSTGRES_USER: mmuser
@@ -28,8 +29,9 @@ services:
       timeout: 5s
       retries: 10
 
-  mattermore:
-    image: ghcr.io/dennisklappe/mattermore:latest
+  maintainedmost:
+    image: ${MAINTAINEDMOST_IMAGE:?set MAINTAINEDMOST_IMAGE to a tested image in .env}
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       postgres:
@@ -39,11 +41,12 @@ services:
       MM_SQLSETTINGS_DATASOURCE: >-
         postgres://mmuser:${POSTGRES_PASSWORD}@postgres:5432/mattermost?sslmode=disable&connect_timeout=10
       MM_SERVICESETTINGS_SITEURL: ${SITE_URL:?set SITE_URL in .env}
-      # Group calls in every channel. Without this the plugin refuses a third
-      # participant, which is the whole reason Mattermore exists.
+      # Retained for compatibility with official Calls; MaintainedMost's checker
+      # allows group calls independently of this upstream switch.
       MM_CALLS_GROUP_CALLS_ALLOWED: "true"
-      # Recording and transcription follow this: set it and both turn on.
+      # Recording/transcription default on with this; explicit plugin opt-outs win.
       MM_CALLS_JOB_SERVICE_URL: http://calls-offloader:4545
+      MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ${CALLS_IMAGE_REGISTRY:?set CALLS_IMAGE_REGISTRY to the image job namespace in .env}
     volumes:
       - mattermost-data:/mattermost/data
       - mattermost-config:/mattermost/config
@@ -53,11 +56,12 @@ services:
     ports:
       - "8065:8065"
       - "8443:8443/udp"
+      - "8443:8443/tcp"
 
   # Runs the recorder and transcriber as short-lived containers. Both of those
   # are Apache 2.0 and this service is AGPL, so nothing here is paywalled.
   calls-offloader:
-    image: docker.io/mattermost/calls-offloader:latest
+    image: docker.io/mattermost/calls-offloader:v0.9.6@sha256:4af1857a626ba5f189cf3e6d4f3053737865db9dfd396aafd241922b7c153efb
     restart: unless-stopped
     # It talks to the Docker socket to start jobs, and the image's own user
     # cannot read it. Mounting that socket already grants root on the host, so
@@ -67,8 +71,10 @@ services:
       # The service sits on the internal compose network, so it can hand out
       # its own credentials rather than making you generate a pair.
       API_SECURITY_ALLOWSELFREGISTRATION: "true"
+      # v0.9.6 parses Jobs.ImageRegistry as JOBS_IMAGEREGISTRY, not DOCKER_IMAGE_REGISTRY.
+      JOBS_IMAGEREGISTRY: ${CALLS_IMAGE_REGISTRY:?set CALLS_IMAGE_REGISTRY to the image job namespace in .env}
       # Job containers join this network to reach the server back.
-      DOCKER_NETWORK: mattermore_default
+      DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME:-maintainedmost}_default
       # Its working directory is read only, and the console log is the one
       # docker compose logs shows anyway.
       LOGGER_ENABLEFILE: "false"

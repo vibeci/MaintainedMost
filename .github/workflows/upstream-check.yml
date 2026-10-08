@@ -1,9 +1,6 @@
-name: upstream-check
+name: MaintainedMost Upstream Check
 
-# Watches every upstream for new stable releases, so a security fix does not
-# sit unnoticed. Opens an issue rather than auto-merging, because a new tag can
-# move the lines a patch depends on.
-
+# Advisory only: patch application is not proof of runtime compatibility.
 on:
   schedule:
     - cron: '17 6 * * *'
@@ -13,74 +10,42 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: maintainedmost-upstream-check
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - key: SERVER_TAG
-            repo: mattermost/mattermost
-            patches: patches/server
-          - key: CALLS_TAG
-            repo: mattermost/mattermost-plugin-calls
-            patches: patches/calls
+        component: [server, calls, transcriber]
     steps:
       - uses: actions/checkout@v4
-
       - id: check
-        run: |
-          set -euo pipefail
-          source upstream.env
-          current="${!MATRIX_KEY}"
-          if ! refs="$(git ls-remote --tags --refs "https://github.com/${{ matrix.repo }}.git" 2>/dev/null)"; then
-            echo "::error::Could not reach ${{ matrix.repo }}"; exit 1
-          fi
-          latest="$(printf '%s\n' "$refs" | awk -F/ '{print $NF}' \
-                    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
-          if [ -z "$latest" ]; then echo "::error::No stable tags found"; exit 1; fi
-          if [ "$latest" != "$current" ]; then echo "new_tag=$latest" >> "$GITHUB_OUTPUT"; fi
-          echo "current=$current" >> "$GITHUB_OUTPUT"
-        env:
-          MATRIX_KEY: ${{ matrix.key }}
-
-      - id: verify
-        if: steps.check.outputs.new_tag
+        name: Fetch and apply the full patch series
         continue-on-error: true
-        run: |
-          git clone --quiet --depth 1 --branch "${{ steps.check.outputs.new_tag }}" \
-            "https://github.com/${{ matrix.repo }}.git" /tmp/upstream
-          for patch in ${{ matrix.patches }}/*.patch; do
-            [ -e "$patch" ] || continue
-            echo "checking $(basename "$patch")"
-            git -C /tmp/upstream apply --check "$patch"
-          done
-
-      - if: steps.check.outputs.new_tag
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: ./scripts/check-upstream.sh "$COMPONENT"
+      - name: Create or refresh upstream alert
+        if: steps.check.outputs.verification == 'clean' || steps.check.outputs.verification == 'conflict'
         uses: actions/github-script@v7
         env:
-          NEW_TAG: ${{ steps.check.outputs.new_tag }}
+          NEW_REF: ${{ steps.check.outputs.new_ref }}
           CURRENT: ${{ steps.check.outputs.current }}
-          REPO: ${{ matrix.repo }}
-          KEY: ${{ matrix.key }}
-          PATCHES_OK: ${{ steps.verify.outcome }}
+          REPO: ${{ steps.check.outputs.repo }}
+          KEY: ${{ steps.check.outputs.key }}
+          VERIFICATION: ${{ steps.check.outputs.verification }}
+          MIN_SERVER: ${{ steps.check.outputs.min_server }}
+          SERVER_TAG: ${{ steps.check.outputs.server_tag }}
+          BRANCH: ${{ steps.check.outputs.branch }}
         with:
           script: |
-            const { NEW_TAG, CURRENT, REPO, KEY, PATCHES_OK } = process.env;
-            const title = `${REPO} ${NEW_TAG} is available`;
-            const open = await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo,
-              state: 'open', labels: 'upstream',
-            });
-            if (open.data.some((i) => i.title === title)) return;
-            const clean = PATCHES_OK === 'success';
-            const body = clean
-              ? `\`${REPO}\` released \`${NEW_TAG}\`, we are on \`${CURRENT}\`. Every patch still applies cleanly.\n\n`
-                + `To ship it: set \`${KEY}=${NEW_TAG}\` in \`upstream.env\`, bump \`CALLS_VERSION\` if this is the calls plugin, and push a tag.`
-              : `\`${REPO}\` released \`${NEW_TAG}\`, we are on \`${CURRENT}\`. **At least one patch no longer applies** and needs rebasing.\n\n`
-                + `The workflow log says which hunk failed. Remember that a patch which cannot be rebased in time can be dropped for one release rather than holding everything up.`;
-            await github.rest.issues.create({
-              owner: context.repo.owner, repo: context.repo.repo,
-              title, body, labels: ['upstream'],
-            });
+            await require('./scripts/upstream-alert.cjs')({github, context});
+      - name: Propagate verification failures
+        if: always() && steps.check.outcome == 'failure'
+        run: |
+          echo 'Upstream verification failed. Network/checkout errors are not patch incompatibility alerts.' >&2
+          exit 1

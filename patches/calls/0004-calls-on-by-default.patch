@@ -28,7 +28,7 @@ index 3b2c712..c6f07fc 100644
  
  	c.AllowEnableCalls = model.NewPointer(true)
  
-+	// Mattermore ships calls usable out of the box, so they are on in every
++	// MaintainedMost ships calls usable out of the box, so they are on in every
 +	// channel unless an admin turns them off.
  	if c.DefaultEnabled == nil {
 -		c.DefaultEnabled = model.NewPointer(false)
@@ -36,3 +36,16 @@ index 3b2c712..c6f07fc 100644
  	}
  	if c.MaxCallParticipants == nil {
  		c.MaxCallParticipants = model.NewPointer(0) // unlimited
+diff --git a/server/configuration_test.go b/server/configuration_test.go
+index 3f6fd8a..c66d152 100644
+--- a/server/configuration_test.go
++++ b/server/configuration_test.go
+@@ -235,7 +235,7 @@ func TestGetClientConfig(t *testing.T) {
+ 	// defaults
+ 	require.Equal(t, model.NewPointer(true), clientCfg.AllowEnableCalls)
+ 	require.Equal(t, p.getConfiguration().AllowEnableCalls, clientCfg.AllowEnableCalls)
+-	require.Equal(t, model.NewPointer(false), clientCfg.DefaultEnabled)
++	require.Equal(t, model.NewPointer(true), clientCfg.DefaultEnabled)
+ 	require.Equal(t, p.getConfiguration().DefaultEnabled, clientCfg.DefaultEnabled)
+ 
+ 	*p.configuration.AllowEnableCalls = false

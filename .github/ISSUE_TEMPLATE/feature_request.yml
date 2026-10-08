@@ -6,14 +6,14 @@ body:
   - type: markdown
     attributes:
       value: |
-        Mattermore only changes AGPL-3.0 code. Anything whose implementation
+        MaintainedMost changes open-source code. Anything whose implementation
         lives in Mattermost's private enterprise module cannot be shipped here:
         that code is not published, so there is nothing to build from. Files
         under `server/enterprise/` carry the Mattermost Source Available
         Licence and are deliberately left untouched, because leaving them alone
-        is what makes Mattermore distributable.
+        is what makes MaintainedMost distributable.
 
-        What Mattermore can do is lift gates in the AGPL code, and build
+        What MaintainedMost can do is lift gates in the AGPL code, and build
         missing capability from scratch where the transport already supports
         it. Group video is the current example: the streams are already
         delivered, the user interface just assumes two people.
@@ -63,6 +63,6 @@ body:
   - type: input
     id: versions
     attributes:
-      label: Mattermost and Mattermore versions
+      label: Mattermost and MaintainedMost versions
       description: Optional, but it helps to know what you are running.
-      placeholder: "Mattermost 10.5.1, Mattermore 1000.12.3"
+      placeholder: "Mattermost 11.11.1, MaintainedMost Calls 1000.12.4"

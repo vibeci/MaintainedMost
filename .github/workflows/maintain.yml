@@ -1,0 +1,139 @@
+name: MaintainedMost Maintenance
+
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+    inputs:
+      preview:
+        description: Validate an update without pushing a branch or opening a PR
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: maintainedmost-vibeci
+  cancel-in-progress: false
+
+# Generation has only the read-only workflow token. The separate controller
+# receives a scoped write token only to publish a privately screened commit.
+jobs:
+  maintain:
+    if: vars.VIBECI_ENABLED == 'true'
+    environment: maintenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 270
+    env:
+      BASE_BRANCH: ${{ github.event.repository.default_branch }}
+      VIBECI_ENABLED: ${{ vars.VIBECI_ENABLED }}
+      VIBECI_PUSH: ${{ vars.VIBECI_PUSH }}
+      VIBECI_AUTOMERGE: ${{ vars.VIBECI_AUTOMERGE }}
+      PREVIEW: ${{ github.event_name != 'workflow_dispatch' || inputs.preview }}
+      AUTOMERGE: ${{ vars.VIBECI_AUTOMERGE == 'true' && vars.VIBECI_PUSH == 'true' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.preview == false)) }}
+      VIBECI_IMAGE: ${{ vars.VIBECI_IMAGE }}
+      VIBECI_SANDBOX_IMAGE: ${{ vars.VIBECI_SANDBOX_IMAGE }}
+      COMPOSE_PROJECT_NAME: maintainedmost-vibeci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check trusted base and existing proposals
+        id: preflight
+        env:
+          GH_TOKEN: ${{ secrets.VIBECI_GIT_TOKEN }}
+        run: python3 -B scripts/vibeci-github.py preflight
+
+      - name: Privately prepare and screen the update plan
+        id: runtime
+        if: steps.preflight.outputs.skip == 'false'
+        env:
+          VIBECI_MODELS: ${{ secrets.VIBECI_MODELS }}
+          VIBECI_PRIVATE_TERMS: ${{ secrets.VIBECI_PRIVATE_TERMS }}
+          VIBECI_LLM_API_KEY: ${{ secrets.VIBECI_LLM_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/vibeci-runtime.py prepare
+
+      - name: Preload immutable engine and sandbox images
+        if: steps.runtime.outputs.changed == 'true'
+        run: |
+          docker pull "$VIBECI_IMAGE"
+          docker pull "$VIBECI_SANDBOX_IMAGE"
+
+      - name: Start broker and wait for its health endpoint
+        id: broker
+        if: steps.runtime.outputs.changed == 'true'
+        run: |
+          sudo chown -R --no-dereference 10001:10001 "$VIBECI_RUN_DIR/data"
+          docker compose -f maintenance/compose.yaml up -d sandboxd
+          docker compose -f maintenance/compose.yaml run --rm -T probe
+
+      - name: Generate privately with read-only Git access
+        id: engine
+        if: steps.runtime.outputs.changed == 'true'
+        env:
+          VIBECI_FORK_READ_TOKEN: ${{ github.token }}
+          VIBECI_LLM_API_KEY: ${{ secrets.VIBECI_LLM_API_KEY }}
+        run: python3 -B scripts/vibeci-runtime.py engine
+
+      - name: Stop broker and remove only this instance's workers
+        id: cleanup
+        if: always() && steps.runtime.outputs.run_dir != ''
+        run: python3 -B scripts/vibeci-github.py cleanup --run-dir "$VIBECI_RUN_DIR"
+
+      - name: Restore host access after workers are stopped
+        id: ownership
+        if: always() && steps.runtime.outputs.run_dir != '' && steps.cleanup.outcome == 'success'
+        run: |
+          if [[ -d "$VIBECI_RUN_DIR/data" ]]; then
+            sudo chown -R --no-dereference "$(id -u):$(id -g)" "$VIBECI_RUN_DIR/data"
+          fi
+
+      - name: Screen and publish only a neutral candidate
+        id: publish
+        if: success() && steps.runtime.outputs.changed == 'true' && steps.engine.outcome == 'success' && steps.cleanup.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.VIBECI_GIT_TOKEN }}
+          VIBECI_FORK_READ_TOKEN: ${{ github.token }}
+          VIBECI_MODELS: ${{ secrets.VIBECI_MODELS }}
+          VIBECI_PRIVATE_TERMS: ${{ secrets.VIBECI_PRIVATE_TERMS }}
+          VIBECI_LLM_API_KEY: ${{ secrets.VIBECI_LLM_API_KEY }}
+        run: |
+          python3 -B scripts/vibeci-runtime.py restore
+          python3 -B scripts/vibeci-github.py publish --data "$VIBECI_RUN_DIR/data" --result "$VIBECI_RUN_DIR/result.json"
+
+      - name: Collect only screened public evidence
+        id: evidence
+        if: always() && steps.runtime.outputs.run_dir != ''
+        env:
+          GH_TOKEN: ${{ secrets.VIBECI_GIT_TOKEN }}
+          VIBECI_FORK_READ_TOKEN: ${{ github.token }}
+          VIBECI_MODELS: ${{ secrets.VIBECI_MODELS }}
+          VIBECI_PRIVATE_TERMS: ${{ secrets.VIBECI_PRIVATE_TERMS }}
+          VIBECI_LLM_API_KEY: ${{ secrets.VIBECI_LLM_API_KEY }}
+          PLAN_OUTCOME: ${{ steps.runtime.outcome }}
+          RUN_OUTCOME: ${{ steps.engine.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          CLEANUP_OUTCOME: ${{ steps.cleanup.outcome }}
+        run: python3 -B scripts/vibeci-runtime.py evidence
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.evidence.outputs.ready == 'true'
+        with:
+          name: maintainedmost-vibeci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.runtime.outputs.run_dir }}/artifacts/summary.md
+            ${{ steps.runtime.outputs.run_dir }}/artifacts/summary.json
+            ${{ steps.runtime.outputs.run_dir }}/artifacts/plan.json
+            ${{ steps.runtime.outputs.run_dir }}/artifacts/result.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Discard private runtime data
+        if: always() && steps.runtime.outputs.run_dir != ''
+        run: python3 -B scripts/vibeci-runtime.py discard

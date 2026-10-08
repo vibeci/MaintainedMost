@@ -1,0 +1,62 @@
+diff --git a/Makefile b/Makefile
+index 9a41194..c4d9c01 100644
+--- a/Makefile
++++ b/Makefile
+@@ -97,6 +97,7 @@ COSIGN_PASSWORD         ?= password
+ GO                           := $(shell which go)
+ # Extract GO version from go.mod file
+ GO_VERSION                   ?= $(shell grep -E '^go' go.mod | awk {'print $$2'})
++GOFLAGS                      ?=
+ # LDFLAGS
+ GO_LDFLAGS                   += -X "github.com/mattermost/${APP_NAME}/service.buildHash=$(APP_COMMIT)"
+ GO_LDFLAGS                   += -X "github.com/mattermost/${APP_NAME}/service.buildVersion=$(APP_VERSION)"
+@@ -193,6 +194,7 @@ endif
+ 	--platform ${DOCKER_BUILD_PLATFORMS} \
+ 	--output=type=${DOCKER_BUILD_OUTPUT_TYPE} \
+ 	--build-arg GO_VERSION=${GO_VERSION} \
++	--build-arg GOFLAGS="${GOFLAGS}" \
+ 	--build-arg OPUS_VERSION=${OPUS_VERSION} \
+ 	--build-arg OPUS_SHA=${OPUS_SHA} \
+ 	--build-arg WHISPER_VERSION=${WHISPER_VERSION} \
+@@ -211,6 +213,7 @@ ifeq ($(shell git tag -l --sort=v:refname | tail -n1),$(APP_VERSION))
+ 	--platform ${DOCKER_BUILD_PLATFORMS} \
+ 	--output=type=${DOCKER_BUILD_OUTPUT_TYPE} \
+ 	--build-arg GO_VERSION=${GO_VERSION} \
++	--build-arg GOFLAGS="${GOFLAGS}" \
+ 	--build-arg OPUS_VERSION=${OPUS_VERSION} \
+ 	--build-arg OPUS_SHA=${OPUS_SHA} \
+ 	--build-arg WHISPER_VERSION=${WHISPER_VERSION} \
+diff --git a/build/Dockerfile b/build/Dockerfile
+index 0870f3b..216b850 100644
+--- a/build/Dockerfile
++++ b/build/Dockerfile
+@@ -44,6 +44,7 @@ WORKDIR /src
+ RUN /bin/bash ./build/prepare_deps.sh ${OPUS_VERSION} ${OPUS_SHA} ${WHISPER_VERSION} ${WHISPER_SHA} "${WHISPER_MODELS}" ${ONNX_VERSION} ${TARGETARCH} ${AZURE_SDK_VERSION} ${AZURE_SDK_SHA} "true"
+ 
+ COPY . /src
++ARG GOFLAGS
+ RUN /bin/bash ./build/build.sh ${OPUS_VERSION} ${OPUS_SHA} ${WHISPER_VERSION} ${WHISPER_SHA} "${WHISPER_MODELS}" ${ONNX_VERSION} ${TARGETARCH} ${AZURE_SDK_VERSION} ${AZURE_SDK_SHA}
+ 
+ FROM base AS runner
+diff --git a/build/prepare_deps.sh b/build/prepare_deps.sh
+index 1b008b1..a11cbc8 100644
+--- a/build/prepare_deps.sh
++++ b/build/prepare_deps.sh
+@@ -49,7 +49,7 @@ echo "${OPUS_SHA} opus-${OPUS_VERSION}.tar.gz" | sha256sum --check && \
+ tar xf opus-${OPUS_VERSION}.tar.gz && \
+ cd opus-${OPUS_VERSION} && \
+ ./configure && \
+-make -j4 && \
++make -j2 && \
+ cd /tmp && \
+ wget https://github.com/ggerganov/whisper.cpp/archive/refs/tags/v${WHISPER_VERSION}.tar.gz && \
+ echo "${WHISPER_SHA} v${WHISPER_VERSION}.tar.gz" | sha256sum --check && \
+@@ -61,7 +61,7 @@ if [ "$TARGET_ARCH" == "amd64" ]; then
+ fi && \
+ for model in ${MODELS}; do ./models/download-ggml-model.sh "${model}"; done && \
+ PATH="$PATH:$CMAKE_PATH" cmake -B build ${CMAKE_ARGS} && \
+-PATH="$PATH:$CMAKE_PATH" cmake --build build -j --config Release && \
++PATH="$PATH:$CMAKE_PATH" cmake --build build --parallel 2 --config Release && \
+ cd /tmp && \
+ wget https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION}/onnxruntime-linux-${ONNX_ARCH}-${ONNX_VERSION}.tgz && \
+ echo "${ONNX_SHA} onnxruntime-linux-${ONNX_ARCH}-${ONNX_VERSION}.tgz" | sha256sum --check && \

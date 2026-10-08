@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Mattermore's brand assets.
+# MaintainedMost's brand assets.
 #
 #   ./scripts/brand-assets.sh render          regenerate brand/images from brand/*.svg
 #   ./scripts/brand-assets.sh apply <path>    copy them into a Mattermost checkout
