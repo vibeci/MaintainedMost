@@ -86,8 +86,8 @@ the job-only values to the transcriber. For Compose, add them to the
 `maintainedmost` service's `environment` block, not just to `.env`:
 
 ```yaml
-MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ghcr.io/OWNER/maintainedmost
-MM_CALLS_TRANSCRIBER_IMAGE: ghcr.io/OWNER/maintainedmost/calls-transcriber:v1.5.0
+MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ghcr.io/vibeci/maintainedmost
+MM_CALLS_TRANSCRIBER_IMAGE: ghcr.io/vibeci/maintainedmost/calls-transcriber:v1.5.0
 MM_CALLS_TRANSCRIBER_TRANSCRIBE_API: openai/api
 MM_CALLS_TRANSCRIBER_OPENAI_API_BASE_URL: https://speech.example.com/v1
 MM_CALLS_TRANSCRIBER_OPENAI_API_KEY: "your-provider-key"

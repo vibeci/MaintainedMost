@@ -25,23 +25,19 @@ independently copied stack with stale image versions. Configure these required
 values in `.env`:
 
 ```ini
-MAINTAINEDMOST_IMAGE=ghcr.io/OWNER/maintainedmost:v1.5.0
-CALLS_IMAGE_REGISTRY=ghcr.io/OWNER/maintainedmost
+MAINTAINEDMOST_IMAGE=ghcr.io/vibeci/maintainedmost:latest
+CALLS_IMAGE_REGISTRY=ghcr.io/vibeci/maintainedmost
 POSTGRES_PASSWORD=use-a-long-random-string-here
 SITE_URL=https://chat.example.com
 ```
 
-Replace `OWNER` and `v1.5.0` with your chosen registry and tested release; these
-are layout examples, not a claim that those images have been published. Do not
-assume the previous publisher's `latest` contains the current fixes.
-
-`CALLS_IMAGE_REGISTRY` is a namespace, without a trailing slash or image tag.
+The `CALLS_IMAGE_REGISTRY` is a namespace, without a trailing slash or image tag.
 Both of these images must be available there:
 
-- `ghcr.io/OWNER/maintainedmost/calls-recorder:<calls_recorder_version>`, mirrored
+- `ghcr.io/vibeci/maintainedmost/calls-recorder:<calls_recorder_version>`, mirrored
   unchanged from upstream. The version comes from the pinned Calls
   `plugin.json` property `calls_recorder_version`, not the server release tag.
-- `ghcr.io/OWNER/maintainedmost/calls-transcriber:v1.5.0`, the patched transcriber
+- `ghcr.io/vibeci/maintainedmost/calls-transcriber:<release_version>`, the patched transcriber
   built for this release, not the unpatched official image.
 
 Use the job namespace selected when the server image was built. Compose passes

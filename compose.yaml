@@ -30,7 +30,7 @@ services:
       retries: 10
 
   maintainedmost:
-    image: ${MAINTAINEDMOST_IMAGE:?set MAINTAINEDMOST_IMAGE to a tested image in .env}
+    image: ${MAINTAINEDMOST_IMAGE:-ghcr.io/vibeci/maintainedmost:latest}
     platform: linux/amd64
     restart: unless-stopped
     depends_on:
@@ -46,7 +46,7 @@ services:
       MM_CALLS_GROUP_CALLS_ALLOWED: "true"
       # Recording/transcription default on with this; explicit plugin opt-outs win.
       MM_CALLS_JOB_SERVICE_URL: http://calls-offloader:4545
-      MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ${CALLS_IMAGE_REGISTRY:?set CALLS_IMAGE_REGISTRY to the image job namespace in .env}
+      MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ${CALLS_IMAGE_REGISTRY:-ghcr.io/vibeci/maintainedmost}
     volumes:
       - mattermost-data:/mattermost/data
       - mattermost-config:/mattermost/config
@@ -72,7 +72,7 @@ services:
       # its own credentials rather than making you generate a pair.
       API_SECURITY_ALLOWSELFREGISTRATION: "true"
       # v0.9.6 parses Jobs.ImageRegistry as JOBS_IMAGEREGISTRY, not DOCKER_IMAGE_REGISTRY.
-      JOBS_IMAGEREGISTRY: ${CALLS_IMAGE_REGISTRY:?set CALLS_IMAGE_REGISTRY to the image job namespace in .env}
+      JOBS_IMAGEREGISTRY: ${CALLS_IMAGE_REGISTRY:-ghcr.io/vibeci/maintainedmost}
       # Job containers join this network to reach the server back.
       DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME:-maintainedmost}_default
       # Its working directory is read only, and the console log is the one
