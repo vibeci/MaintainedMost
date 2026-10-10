@@ -1,0 +1,10 @@
+{
+  "commit": "543d23a7d622a323f7470b08beabe3dced588d45",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Adds a patch and documentation to remove the license check on channel moderation endpoints and UI.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383833972Z"
+}

@@ -1,0 +1,17 @@
+{
+  "commit": "5f346c0d3ad71aee0a7ed1075fccaf971cd130f6",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Adds a server patch and environment variable to skip superseded prepackaged plugin bundles at startup.",
+  "signals": [
+    {
+      "kind": "build_config",
+      "file": "Containerfile",
+      "detail": "build, packaging or install configuration changed"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383835885Z"
+}

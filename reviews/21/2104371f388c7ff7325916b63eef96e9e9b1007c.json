@@ -1,0 +1,10 @@
+{
+  "commit": "2104371f388c7ff7325916b63eef96e9e9b1007c",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Add patch to retry calls job service initialization and update OpenID documentation.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934940127Z"
+}

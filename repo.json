@@ -1,0 +1,24 @@
+{
+  "repo": "maintainedmost",
+  "last_upstream_tip": "2104371f388c7ff7325916b63eef96e9e9b1007c",
+  "last_fork_head": "32ef70d068aeb6f6045dc85168e189e33df57661",
+  "last_result": "dry-run",
+  "last_message": "unchanged since the dry run at 2026-10-10T12:56:47Z; would push 80c3b1333f",
+  "last_job": "maintainedmost-20261010-123942-2f14c6",
+  "last_attempt": "2026-10-10T21:49:58.772661416Z",
+  "proposal": {
+    "base": "32ef70d068aeb6f6045dc85168e189e33df57661",
+    "upstream": "2104371f388c7ff7325916b63eef96e9e9b1007c",
+    "target": "2104371f388c7ff7325916b63eef96e9e9b1007c",
+    "commit": "80c3b1333f2915a3fdd316c3fd72bcc36ad28e66",
+    "job_id": "maintainedmost-20261010-123942-2f14c6",
+    "time": "2026-10-10T12:56:47.8861494Z"
+  },
+  "usage": {
+    "input_tokens": 13664173,
+    "output_tokens": 53574,
+    "cache_read_tokens": 12246350,
+    "cache_write_tokens": 0,
+    "calls": 148
+  }
+}

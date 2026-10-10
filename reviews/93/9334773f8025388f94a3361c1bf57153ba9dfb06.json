@@ -1,0 +1,47 @@
+{
+  "commit": "9334773f8025388f94a3361c1bf57153ba9dfb06",
+  "verdict": "clean",
+  "confidence": 0.98,
+  "summary": "Adds an email newsletter signup form and Cloudflare Worker handlers for double opt-in release notifications.",
+  "signals": [
+    {
+      "kind": "binary_added",
+      "file": "site/public/logo-mail.png",
+      "detail": "image, 4347 bytes"
+    },
+    {
+      "kind": "new_urls",
+      "file": "site/src/components/UpdateSignup.astro",
+      "detail": "hosts referenced in added code: challenges.cloudflare.com"
+    },
+    {
+      "kind": "new_urls",
+      "file": "site/src/config/balie.ts",
+      "detail": "hosts referenced in added code: api.mattermore.dev"
+    },
+    {
+      "kind": "new_urls",
+      "file": "site/src/layouts/DocsLayout.astro",
+      "detail": "hosts referenced in added code: github.com"
+    },
+    {
+      "kind": "new_urls",
+      "file": "site/src/pages/unsubscribed.astro",
+      "detail": "hosts referenced in added code: github.com"
+    },
+    {
+      "kind": "new_urls",
+      "file": "worker/src/index.ts",
+      "detail": "hosts referenced in added code: api.mattermore.dev, challenges.cloudflare.com, mattermore.dev"
+    },
+    {
+      "kind": "new_urls",
+      "file": "worker/src/mail.ts",
+      "detail": "hosts referenced in added code: mattermore.dev"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.38383297Z"
+}

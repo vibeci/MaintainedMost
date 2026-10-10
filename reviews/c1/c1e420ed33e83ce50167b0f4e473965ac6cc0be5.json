@@ -1,0 +1,22 @@
+{
+  "commit": "c1e420ed33e83ce50167b0f4e473965ac6cc0be5",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Bump server version, add an e2e test script and workflow, and add a transcript-only setting patch.",
+  "signals": [
+    {
+      "kind": "ci_config",
+      "file": ".github/workflows/build.yml",
+      "detail": "CI/CD configuration changed (runs with repository secrets)"
+    },
+    {
+      "kind": "ci_config",
+      "file": ".github/workflows/upstream-check.yml",
+      "detail": "CI/CD configuration changed (runs with repository secrets)"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934939115Z"
+}

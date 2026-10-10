@@ -1,0 +1,10 @@
+{
+  "commit": "cdc11f8e1847e6cdbb1d93d9481bce8faa20c024",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Add documentation guide for migrating from MySQL to PostgreSQL.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934939646Z"
+}
