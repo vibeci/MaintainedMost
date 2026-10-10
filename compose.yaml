@@ -1,6 +1,6 @@
 # MaintainedMost, with everything the advertised features need.
 #
-#   cp .env.example .env   # set the image, job registry, URL and password
+#   cp .env.example .env   # review the vibeci image defaults, set URL and password
 #   docker compose up -d
 #
 # Recording and transcription need reachable, compatible job images and a ready

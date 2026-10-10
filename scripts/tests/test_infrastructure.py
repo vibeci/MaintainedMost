@@ -606,13 +606,26 @@ class TestGateTests(unittest.TestCase):
         compose = (ROOT / "compose.yaml").read_text()
         self.assertIn("name: ${COMPOSE_PROJECT_NAME:-maintainedmost}\n", compose)
         self.assertIn("DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME:-maintainedmost}_default\n", compose)
-        self.assertIn("  maintainedmost:\n    image: ${MAINTAINEDMOST_IMAGE:?", compose)
+        self.assertIn("  maintainedmost:\n    image: ${MAINTAINEDMOST_IMAGE:-ghcr.io/vibeci/maintainedmost:latest}\n", compose)
+        self.assertIn("MM_CALLS_JOB_SERVICE_IMAGE_REGISTRY: ${CALLS_IMAGE_REGISTRY:-ghcr.io/vibeci/maintainedmost}\n", compose)
+        self.assertIn("JOBS_IMAGEREGISTRY: ${CALLS_IMAGE_REGISTRY:-ghcr.io/vibeci/maintainedmost}\n", compose)
+        self.assertNotIn("${MAINTAINEDMOST_IMAGE:?", compose)
+        self.assertNotIn("${CALLS_IMAGE_REGISTRY:?", compose)
+        self.assertNotIn("ghcr.io/OWNER/", compose)
         self.assertIn("POSTGRES_DB: mattermost\n", compose)
         volume_keys = re.findall(r"^  ([a-z-]+):$", compose.split("\nvolumes:\n", 1)[1], re.M)
         self.assertEqual(volume_keys, ["postgres", "mattermost-data", "mattermost-config", "mattermost-logs", "mattermost-plugins", "mattermost-client-plugins", "offloader"])
         example = (ROOT / ".env.example").read_text()
         self.assertIn("COMPOSE_PROJECT_NAME=maintainedmost\n", example)
-        self.assertIn("MAINTAINEDMOST_IMAGE=\n", example)
+        self.assertIn("MAINTAINEDMOST_IMAGE=ghcr.io/vibeci/maintainedmost:latest\n", example)
+        self.assertIn("CALLS_IMAGE_REGISTRY=ghcr.io/vibeci/maintainedmost\n", example)
+        self.assertNotIn("ghcr.io/OWNER/", example)
+        # Operator docs must stay in sync with the shipped defaults so a
+        # compose/.env change without a docs update (or vice versa) fails fast.
+        selfhost = (ROOT / "docs/selfhost.md").read_text()
+        self.assertIn("MAINTAINEDMOST_IMAGE=ghcr.io/vibeci/maintainedmost:latest\n", selfhost)
+        self.assertIn("CALLS_IMAGE_REGISTRY=ghcr.io/vibeci/maintainedmost\n", selfhost)
+        self.assertNotIn("ghcr.io/OWNER/", selfhost)
 
     def test_prepackaged_skip_does_not_skip_rebranded_calls(self):
         container = (ROOT / "Containerfile").read_text()
