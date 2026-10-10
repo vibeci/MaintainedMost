@@ -544,12 +544,17 @@ class TestGateTests(unittest.TestCase):
         paths.extend(path for path in (ROOT / ".github").rglob("*") if path.is_file())
         paths.extend((ROOT / "patches").glob("*/*.patch"))
         retired_links = r"(?i)\b(?:[a-z0-9-]+\.)?mattermore\.dev\b|(?:github\.com|raw\.githubusercontent\.com|ghcr\.io)/dennisklappe/mattermore\b"
+        upstream_pointer = "https://github.com/dennisklappe/mattermore.git"
         for path in paths:
             with self.subTest(path=path.relative_to(ROOT)):
                 content = path.read_text()
                 if path.suffix == ".patch":
                     # Removed lines describe upstream/history, not shipped behavior.
                     content = "\n".join(line for line in content.splitlines() if not line.startswith("-"))
+                if path == ROOT / ".github/vibeci.jsonc":
+                    # The canonical maintenance config must name the upstream
+                    # it merges from; that functional pointer is not a retired link.
+                    content = content.replace(upstream_pointer, "")
                 self.assertNotRegex(content, retired_links)
 
     def test_retired_website_has_no_workflow_hooks(self):

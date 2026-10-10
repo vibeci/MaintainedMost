@@ -1,0 +1,29 @@
+// Canonical VibeCI maintenance configuration (see docs/maintenance.md).
+// The GitHub Action names this repository the fork at its default branch,
+// so no "fork" entry is checked in here; model configuration arrives via
+// the VIBECI_MODELS secret, whose URLs, keys and model ids the action
+// masks in logs and summaries. No providers, keys or private names below.
+{
+  "identity": { "name": "vibeci-viber[bot]", "email": "vibeci-viber[bot]@users.noreply.github.com" },
+  "repos": [
+    {
+      "name": "maintainedmost",
+      "upstream": { "url": "https://github.com/dennisklappe/mattermore.git", "branch": "main" },
+      "description": "MaintainedMost: Mattermost with the follow-through — rebranded server, prepackaged Calls plugin with recording/transcription defaults on, repository-only build with no published website. Keep the rebrand, the plugin bundle, the job-service defaults and the test gates; preserve data volumes and compose project naming.",
+      "keep_ours": [".github/workflows/**"],
+      "sandbox": { "profile": "default" },
+      "verify": [
+        { "name": "shell-syntax", "run": "for f in scripts/*.sh; do bash -n \"$f\"; done", "timeout": "5m" }
+      ],
+      "review": {
+        "block_on": "malicious",
+        "min_confidence": 0.7,
+        "on_blocked": "exclude",
+        "max_commits_per_run": 250
+      },
+      "resolve": { "max_rounds": 4, "timeout": "90m" },
+      "push": { "mode": "direct", "dry_run": true },
+      "on_upstream_rewrite": "hold"
+    }
+  ]
+}

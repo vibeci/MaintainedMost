@@ -1,0 +1,55 @@
+# Canonical VibeCI self-maintenance (see docs/maintenance.md): keeps this
+# fork merged with its upstream through the pinned vibeci action. The run
+# is a no-op until the VIBECI_MODELS and VIBECI_TOKEN secrets exist, and
+# pushes nothing while .github/vibeci.jsonc keeps push.dry_run enabled.
+name: VibeCI
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: run, review, status, allow, exclude, release, check, patches or config
+        default: run
+      args:
+        description: arguments, e.g. -dry-run or -reason "false positive" 1a2b3c4d5e
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vibeci
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          MODELS: ${{ secrets.VIBECI_MODELS }}
+          TOKEN: ${{ secrets.VIBECI_TOKEN }}
+        run: |
+          if [ -n "$MODELS" ] && [ -n "$TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::VIBECI_MODELS and/or VIBECI_TOKEN are not set; skipping (see docs/maintenance.md)"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  vibeci:
+    needs: gate
+    if: needs.gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: vibeci/vibeci@03941d86bc53522fc07924246d77e58335ca9378 # v0.1.0
+        with:
+          models: ${{ secrets.VIBECI_MODELS }}
+          token: ${{ secrets.VIBECI_TOKEN }}
+          command: ${{ inputs.command || 'run' }}
+          args: ${{ inputs.args }}

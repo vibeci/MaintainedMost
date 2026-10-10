@@ -5,6 +5,54 @@ committing these files**: the target repository, images, model access, bot token
 and branch protection must be provisioned first. Nothing here configures or
 modifies the separate VibeCI source checkout.
 
+Two integrations exist. The canonical one below (the
+[`vibeci/vibeci` action](https://github.com/vibeci/vibeci)) is preferred for
+new provisioning. The Python adapter further down
+(`maintain.yml`, `scripts/vibeci-*.py`) remains documented but is legacy.
+
+## Canonical Action Setup
+
+[`.github/vibeci.jsonc`](../.github/vibeci.jsonc) configures this repository
+as a merge-mode fork of `dennisklappe/mattermore` `main`: upstream commits
+are LLM-reviewed for blatant malice, conflicts are resolved by an agent in a
+sandbox, the result is verified, and a merge commit is pushed — never a
+rebase. Commit identity is the maintenance bot. The file holds no `fork`
+entry (the action names this repository the fork at its default branch) and
+no providers or keys; model configuration arrives via secret.
+
+[`.github/workflows/vibeci.yml`](../.github/workflows/vibeci.yml) runs the
+pinned action (`vibeci/vibeci@v0.1.0`) every six hours and on manual dispatch
+(`command`/`args` inputs: `check`, `run -dry-run`, `review`, `status`,
+`allow`, `exclude`, `release`, `patches`, `config`). It does nothing unless
+both secrets below exist, and pushes nothing while the config keeps
+`push.dry_run` enabled. `keep_ours` always keeps the fork's workflows.
+
+### Secrets
+
+Create both as repository (or `maintenance` environment) secrets used only
+by this workflow. Never check them into code, docs, examples or logs.
+
+| Secret | Contents |
+| --- | --- |
+| `VIBECI_TOKEN` | Token that may push to the fork **and change its workflows**: a fine-grained PAT with Contents and Workflows read/write, or a GitHub App installation token with the same permissions. The workflow `GITHUB_TOKEN` is not enough, and its pushes would not trigger CI. |
+| `VIBECI_MODELS` | Providers, models and roles as JSONC, e.g. `{"providers": {"anthropic": {"type": "anthropic", "api_key": "sk-ant-..."}}, "models": {"strong": {"provider": "anthropic", "model": "claude-opus-4-1"}}, "roles": {"triage": "strong", "investigate": "strong", "audit": "strong", "resolve": ["strong"]}}`. URLs, keys and model ids are masked in logs and summaries. |
+
+### Activation
+
+1. Add the two secrets. Manually run **VibeCI** with command `check`.
+2. Run with `run` and args `-dry-run`: the merge is computed and verified
+   but not pushed.
+3. Review dry-run outcomes over real upstream drift, then set `dry_run: false`
+   in `.github/vibeci.jsonc` to go live.
+
+Going live against the protected `main` branch needs one of: allow the
+maintenance identity to bypass the pull-request rule in the branch ruleset,
+or switch the config to `push: {"mode": "branch"}` and merge the proposal
+branches by hand. Every live push triggers the normal Build workflow, which
+is the full verification gate (the in-sandbox `verify` is only a smoke
+check). Run state lives in the fork under `refs/vibeci/state`, which branch
+protection does not cover; that ref is as trusted as the token holder.
+
 ## Update Contract
 
 The daily [maintenance workflow](../.github/workflows/maintain.yml) runs at
