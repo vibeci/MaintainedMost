@@ -58,7 +58,7 @@ resolve_commit() { # repo tag -> 40-hex sha
 image_digest() { # image-without-digest -> sha256 hex
     local raw
     raw="$(docker buildx imagetools inspect --raw "$1" 2>/dev/null)" || { echo "cannot inspect $1" >&2; exit 1; }
-    printf '%s' "$raw" | sha256sum | cut -d' ' -f1
+    printf '%s' "$raw" | shasum -a 256 | cut -d' ' -f1
 }
 
 case "$component" in

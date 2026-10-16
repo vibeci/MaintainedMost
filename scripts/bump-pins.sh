@@ -24,8 +24,17 @@ get() {
 
 set_key() {
     local key="$1" value="$2"
-    grep -qE "^${key}=" "$ENV" || { echo "missing $key in upstream.env" >&2; return 1; }
-    sed -i '' "s|^${key}=.*|${key}=${value}|" "$ENV"
+    python3 - "$ENV" "$key" "$value" <<'PY'
+import re, sys
+path, key, value = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path) as source:
+    text = source.read()
+updated, count = re.subn(rf"^{re.escape(key)}=.*$", f"{key}={value}", text, count=1, flags=re.MULTILINE)
+if not count:
+    sys.exit(f"missing {key} in upstream.env")
+with open(path, "w") as target:
+    target.write(updated)
+PY
 }
 
 valid_tag() { [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }
@@ -41,11 +50,18 @@ replace_all() {
     local file
     for file in "$@"; do
         [[ -f "$file" ]] || { echo "missing file: $file" >&2; return 1; }
-        # Escape sed metacharacters in the pattern; & and \ in the replacement.
-        local pattern replacement
-        pattern="$(printf '%s' "$old" | sed 's|[][\.*^$/]|\\&|g')"
-        replacement="$(printf '%s' "$new" | sed 's|[&\]|\\&|g')"
-        sed -i '' "s|${pattern}|${replacement}|g" "$file"
+    done
+    # Fixed-string replacement via python3: portable across BSD/GNU sed.
+    python3 - "$old" "$new" "$@" <<'PY'
+import sys
+old, new, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
+for path in paths:
+    with open(path) as source:
+        text = source.read()
+    with open(path, "w") as target:
+        target.write(text.replace(old, new))
+PY
+    for file in "$@"; do
         if grep -qF "$old" "$file"; then
             echo "stale reference to '${old}' remains in $file" >&2
             return 1
