@@ -154,7 +154,7 @@ case "$component" in
         if [[ -n "$recorder_tag" ]]; then
             valid_tag "$recorder_tag" || { echo "bad --recorder-tag" >&2; exit 2; }
             valid_image "$recorder_image" || { echo "bad --recorder-image" >&2; exit 2; }
-            old_recorder_tag="$(get RECORDER_TAG)"; old_recorder_image="$(get RECORDER_SOURCE_IMAGE)"
+            old_recorder_tag="$(get RECORDER_TAG)"
             set_key RECORDER_TAG "$recorder_tag"
             set_key RECORDER_SOURCE_IMAGE "$recorder_image"
             echo "recorder: ${old_recorder_tag} -> ${recorder_tag}"
