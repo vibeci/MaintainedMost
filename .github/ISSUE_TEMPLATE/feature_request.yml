@@ -65,4 +65,4 @@ body:
     attributes:
       label: Mattermost and MaintainedMost versions
       description: Optional, but it helps to know what you are running.
-      placeholder: "Mattermost 11.11.1, MaintainedMost Calls 1000.12.4"
+      placeholder: "Mattermost 12.0.0, MaintainedMost Calls 1000.12.5"

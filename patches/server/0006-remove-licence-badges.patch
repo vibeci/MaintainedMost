@@ -12,16 +12,6 @@ unsupported edition of Mattermost.' main menu notice:
 
 Also drops the two now-obsolete test files and the two orphaned en.json strings.
 ---
- .../product_branding_free_edition.test.tsx    | 122 ------------------
- .../product_branding_free_edition.tsx         |  31 +----
- .../components/header_footer_route/header.tsx |   7 +-
- .../menu/menu_items/menu_start_trial.test.tsx | 106 ---------------
- .../menu/menu_items/menu_start_trial.tsx      |  95 +-------------
- webapp/channels/src/i18n/en.json              |   2 -
- 6 files changed, 10 insertions(+), 353 deletions(-)
- delete mode 100644 webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.test.tsx
- delete mode 100644 webapp/channels/src/components/widgets/menu/menu_items/menu_start_trial.test.tsx
-
 diff --git a/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.test.tsx b/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.test.tsx
 deleted file mode 100644
 index 94674499..00000000
@@ -151,13 +141,13 @@ index 94674499..00000000
 -    });
 -});
 diff --git a/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.tsx b/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.tsx
-index 93cb8ab2..f2db636c 100644
+index abdbad2f..65d22ecf 100644
 --- a/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.tsx
 +++ b/webapp/channels/src/components/global_header/left_controls/product_menu/product_branding_team_edition/product_branding_free_edition.tsx
 @@ -2,15 +2,10 @@
  // See LICENSE.txt for license information.
  
- import React from 'react';
+ import React, {type JSX} from 'react';
 -import {useSelector} from 'react-redux';
  import styled from 'styled-components';
  
@@ -211,7 +201,7 @@ index 93cb8ab2..f2db636c 100644
      );
  };
 diff --git a/webapp/channels/src/components/header_footer_route/header.tsx b/webapp/channels/src/components/header_footer_route/header.tsx
-index 0e2de0c2..dda43fb5 100644
+index 59e924d6..eed6a84a 100644
 --- a/webapp/channels/src/components/header_footer_route/header.tsx
 +++ b/webapp/channels/src/components/header_footer_route/header.tsx
 @@ -26,11 +26,10 @@ const Header = ({alternateLink, backButtonURL, onBackButtonClick}: HeaderProps)
@@ -342,14 +332,13 @@ index 77024197..00000000
 -    });
 -});
 diff --git a/webapp/channels/src/components/widgets/menu/menu_items/menu_start_trial.tsx b/webapp/channels/src/components/widgets/menu/menu_items/menu_start_trial.tsx
-index d48d51e4..167f53ae 100644
+index b3a73561..46f5e864 100644
 --- a/webapp/channels/src/components/widgets/menu/menu_items/menu_start_trial.tsx
 +++ b/webapp/channels/src/components/widgets/menu/menu_items/menu_start_trial.tsx
-@@ -1,99 +1,16 @@
- // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+@@ -2,98 +2,15 @@
  // See LICENSE.txt for license information.
  
--import React from 'react';
+ import React, {type JSX} from 'react';
 -import {useIntl} from 'react-intl';
 -import {useSelector} from 'react-redux';
 -import styled from 'styled-components';
@@ -377,7 +366,6 @@ index d48d51e4..167f53ae 100644
 -     letter-spacing: 0.025em;
 -     line-height: 16px;
 -`;
-+import type React from 'react';
  
  type Props = {
      id: string;
@@ -448,29 +436,32 @@ index d48d51e4..167f53ae 100644
 +// edition of Mattermost." as a main menu item. Self-hosted AGPL builds are not
 +// advertised that way, so nothing is rendered. The component is kept so
 +// Menu.StartTrial and its call sites stay valid.
-+const MenuStartTrial: React.FC<Props> = () => null;
++const MenuStartTrial: React.FC<Props> = (): JSX.Element | null => null;
  
  export default MenuStartTrial;
 diff --git a/webapp/channels/src/i18n/en.json b/webapp/channels/src/i18n/en.json
-index 07c8743a..660d71fa 100644
+index 7c22f8a2..461afcaa 100644
 --- a/webapp/channels/src/i18n/en.json
 +++ b/webapp/channels/src/i18n/en.json
-@@ -6316,7 +6316,6 @@
-   "navbar_dropdown.create.modal.titleAdminPreTrial": "Try unlimited teams with a free trial",
-   "navbar_dropdown.create.modal.titleEndUser": "Multiple teams available in paid plans",
-   "navbar_dropdown.create.tooltip.cloudFreeTrial": "During your trial you are able to create multiple teams. These teams will be archived after your trial.",
--  "navbar_dropdown.entryVersionText": "Entry offers Enterprise Advance capabilities <link>with limits</link> designed to support evaluation.",
-   "navbar_dropdown.help": "Help",
-   "navbar_dropdown.integrations": "Integrations",
-   "navbar_dropdown.invitePeople": "Invite People",
-@@ -6342,7 +6341,6 @@
-   "navbar_dropdown.userGroups.modal.titleAdminPreTrial": "Try unlimited user groups with a free trial",
-   "navbar_dropdown.userGroups.modal.titleEndUser": "User groups available in paid plans",
-   "navbar_dropdown.userGroups.tooltip.cloudFreeTrial": "During your trial you are able to create user groups. These user groups will be archived after your trial.",
--  "navbar_dropdown.versionText": "This is the free <link>unsupported</link> edition of Mattermost.",
-   "navbar_dropdown.viewMembers": "View Members",
-   "navbar.addGroups": "Add Groups",
-   "navbar.addMembers": "Add Members",
--- 
-2.53.0
-
+@@ -26051,10 +26051,6 @@
+     "defaultMessage": "During your trial you are able to create multiple teams. These teams will be archived after your trial.",
+     "description": "Tooltip on the create-team option during a Cloud free trial, warning that teams created will be archived when the trial ends."
+   },
+-  "navbar_dropdown.entryVersionText": {
+-    "defaultMessage": "Entry offers Enterprise Advance capabilities <link>with limits</link> designed to support evaluation.",
+-    "description": "Text in the main menu describing the free Entry edition; 'Entry' and 'Enterprise Advanced' are plan names; <link> wraps the linked words."
+-  },
+   "navbar_dropdown.help": {
+     "defaultMessage": "Help",
+     "description": "Menu item in the mobile right sidebar menu linking to help documentation."
+@@ -26155,10 +26151,6 @@
+     "defaultMessage": "During your trial you are able to create user groups. These user groups will be archived after your trial.",
+     "description": "Tooltip on the user groups option during a Cloud free trial, warning that groups created will be archived when the trial ends."
+   },
+-  "navbar_dropdown.versionText": {
+-    "defaultMessage": "This is the free <link>unsupported</link> edition of Mattermost.",
+-    "description": "Text in the main menu describing the free unsupported edition; <link> wraps the word that links to more information."
+-  },
+   "navbar_dropdown.viewMembers": {
+     "defaultMessage": "View Members",
+     "description": "Menu item in the mobile right sidebar menu that opens the read-only list of team members."

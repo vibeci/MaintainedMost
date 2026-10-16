@@ -51,18 +51,18 @@ permissions still apply.
 ships a prepackaged copy of official Calls and installs it if it looks newer.
 The high version avoids replacement by lower-versioned official bundles; it
 does not guarantee future server compatibility. The current bundle is
-1000.12.4 from Calls source 1.12.3, with fork-only fixes advancing the bundle.
+1000.12.5 from Calls source 1.12.5, with fork-only fixes advancing the bundle.
 
 **The repo holds ordered patches against immutable pins.** A conflict fails the
-build; patches are never silently dropped. Server 11.11.1 is pinned to a commit
-and matching image digest, Calls remains at 1.12.3 because 1.12.5 requires
-server 12, and the transcriber is pinned at c09a9a3. Updating them requires
+build; patches are never silently dropped. Server 12.0.0 is pinned to a commit
+and matching image digest, Calls follows the newest stable release compatible
+with that server, and the transcriber is pinned at c09a9a3. Updating them requires
 compatibility, commit and runtime-image review, plus testing.
 
 ## Requirements
 
-- A compatible self-hosted server: the Calls manifest minimum is v11.0 and the
-  current integration target is v11.11.1. The server image and repository Compose
+- A compatible self-hosted server: the Calls manifest minimum is v12.0 and the
+  current integration target is v12.0.0. The server image and repository Compose
   stack target Linux/amd64.
 - System administrator access to the server.
 - Deployment access for configuration, job services and recovery.

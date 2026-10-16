@@ -16,9 +16,10 @@ Any conflict fails the build. No patch is silently dropped, and checking each
 patch separately is not a substitute for applying the complete series.
 
 Source updates require tag/commit review, a matching server image digest,
-compatibility checks and the full CI gate. The current pins are server 11.11.1,
-Calls source 1.12.3 and transcriber commit c09a9a3. Calls 1.12.5 requires server
-12; bundle version 1000.12.4 advances for fork fixes without changing Calls
+compatibility checks and the full CI gate. The current pins are server 12.0.0,
+Calls source 1.12.5 and transcriber commit c09a9a3. Calls tracks the newest
+release compatible with the pinned server; bundle version 1000.12.5 advances
+for fork fixes without changing Calls
 source. `upstream.env` is authoritative for full hashes and toolchain versions.
 
 Patches delete conditions rather than adding code wherever possible. Removing

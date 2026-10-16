@@ -1,5 +1,5 @@
 diff --git a/server/activate.go b/server/activate.go
-index 0edfbf2..0b93f70 100644
+index bbc7857..3208a81 100644
 --- a/server/activate.go
 +++ b/server/activate.go
 @@ -12,7 +12,6 @@ import (
@@ -10,7 +10,7 @@ index 0edfbf2..0b93f70 100644
  	"github.com/mattermost/mattermost-plugin-calls/server/license"
  
  	"github.com/mattermost/rtcd/service/rtc"
-@@ -83,7 +82,7 @@ func (p *Plugin) OnActivate() (retErr error) {
+@@ -97,7 +96,7 @@ func (p *Plugin) OnActivate() (retErr error) {
  		}
  	}()
  
@@ -190,7 +190,7 @@ index 9683a0e..3f6fd8a 100644
  	adminClientCfg := p.getAdminClientConfig(p.getConfiguration())
 diff --git a/server/license/checker.go b/server/license/checker.go
 new file mode 100644
-index 0000000..22b0810
+index 0000000..a2a31f8
 --- /dev/null
 +++ b/server/license/checker.go
 @@ -0,0 +1,40 @@
@@ -236,7 +236,7 @@ index 0000000..22b0810
 +func (c *Checker) GroupCallsAllowed() bool { return true }
 diff --git a/server/license/checker_test.go b/server/license/checker_test.go
 new file mode 100644
-index 0000000..07cb017
+index 0000000..371c695
 --- /dev/null
 +++ b/server/license/checker_test.go
 @@ -0,0 +1,21 @@
@@ -262,7 +262,7 @@ index 0000000..07cb017
 +	}
 +}
 diff --git a/server/plugin.go b/server/plugin.go
-index f890dff..7bcb7c5 100644
+index dcdd343..46f34ec 100644
 --- a/server/plugin.go
 +++ b/server/plugin.go
 @@ -15,8 +15,8 @@ import (
@@ -285,7 +285,7 @@ index f890dff..7bcb7c5 100644
  	// configurationLock synchronizes access to the configuration.
  	configurationLock sync.RWMutex
 diff --git a/server/session_test.go b/server/session_test.go
-index d8ba1df..7227596 100644
+index 5f91672..4a48de8 100644
 --- a/server/session_test.go
 +++ b/server/session_test.go
 @@ -8,7 +8,7 @@ import (
@@ -297,7 +297,7 @@ index d8ba1df..7227596 100644
  	"github.com/mattermost/mattermost-plugin-calls/server/public"
  
  	serverMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost-plugin-calls/server/interfaces"
-@@ -39,7 +39,7 @@ func TestAddUserSession(t *testing.T) {
+@@ -439,7 +439,7 @@ func TestAddUserSession(t *testing.T) {
  		sessions: map[string]*session{},
  	}
  
@@ -306,7 +306,7 @@ index d8ba1df..7227596 100644
  
  	store, tearDown := NewTestStore(t)
  	t.Cleanup(tearDown)
-@@ -51,11 +51,6 @@ func TestAddUserSession(t *testing.T) {
+@@ -451,11 +451,6 @@ func TestAddUserSession(t *testing.T) {
  		defer mockAPI.AssertExpectations(t)
  		defer mockMetrics.AssertExpectations(t)
  
@@ -318,7 +318,7 @@ index d8ba1df..7227596 100644
  		var cs *callState
  		state, err := p.addUserSession(cs, model.NewPointer(false), "userID", "connID", "channelID", "", model.ChannelTypeOpen)
  		require.Nil(t, state)
-@@ -67,11 +62,6 @@ func TestAddUserSession(t *testing.T) {
+@@ -467,11 +462,6 @@ func TestAddUserSession(t *testing.T) {
  		defer mockMetrics.AssertExpectations(t)
  		defer ResetTestStore(t, p.store)
  
@@ -330,7 +330,7 @@ index d8ba1df..7227596 100644
  		// We'd be starting a new call
  		mockMetrics.On("IncWebSocketEvent", "out", wsEventCallHostChanged).Once()
  		mockAPI.On("PublishWebSocketEvent", wsEventCallHostChanged, mock.Anything,
-@@ -106,58 +96,24 @@ func TestAddUserSession(t *testing.T) {
+@@ -506,58 +496,24 @@ func TestAddUserSession(t *testing.T) {
  		require.Equal(t, retState, retState2)
  	})
  
@@ -342,7 +342,7 @@ index d8ba1df..7227596 100644
 -
 -		mockAPI.On("GetConfig").Return(&model.Config{}, nil).Times(6)
 -		mockAPI.On("GetLicense").Return(&model.License{}, nil).Times(3)
--
+ 
 -		t.Run("public channel", func(t *testing.T) {
 -			mockAPI.On("SendEphemeralPost", "userA", &model.Post{
 -				ChannelId: "channelID",
@@ -353,7 +353,7 @@ index d8ba1df..7227596 100644
 -			require.Equal(t, errGroupCallsNotAllowed, err)
 -			require.Nil(t, retState)
 -		})
- 
+-
 -		t.Run("private channel", func(t *testing.T) {
 -			mockAPI.On("SendEphemeralPost", "userA", &model.Post{
 -				ChannelId: "channelID",
@@ -406,10 +406,10 @@ index d8ba1df..7227596 100644
  	})
  }
 diff --git a/server/websocket_test.go b/server/websocket_test.go
-index 8645e99..2b90b3a 100644
+index 9ae3727..3489444 100644
 --- a/server/websocket_test.go
 +++ b/server/websocket_test.go
-@@ -15,7 +15,7 @@ import (
+@@ -16,7 +16,7 @@ import (
  	"github.com/mattermost/mattermost-plugin-calls/server/batching"
  	"github.com/mattermost/mattermost-plugin-calls/server/cluster"
  	"github.com/mattermost/mattermost-plugin-calls/server/db"
@@ -418,8 +418,8 @@ index 8645e99..2b90b3a 100644
  	"github.com/mattermost/mattermost-plugin-calls/server/public"
  
  	serverMocks "github.com/mattermost/mattermost-plugin-calls/server/mocks/github.com/mattermost/mattermost-plugin-calls/server/interfaces"
-@@ -788,7 +788,7 @@ func TestHandleJoin(t *testing.T) {
- 		removeSessionsBatchers: map[string]*batching.Batcher{},
+@@ -966,7 +966,7 @@ func TestHandleJoin(t *testing.T) {
+ 		dmNoAnswerTimers:       map[string]*time.Timer{},
  	}
  
 -	p.licenseChecker = enterprise.NewLicenseChecker(p.API)
@@ -427,7 +427,7 @@ index 8645e99..2b90b3a 100644
  
  	mockMetrics.On("RTCMetrics").Return(mockRTCMetrics).Once()
  	mockAPI.On("LogDebug", mock.Anything, mock.Anything, mock.Anything,
-@@ -863,7 +863,7 @@ func TestHandleJoin(t *testing.T) {
+@@ -1041,7 +1041,7 @@ func TestHandleJoin(t *testing.T) {
  			&model.WebsocketBroadcast{UserId: userID, ChannelId: channelID, ReliableClusterSend: true}).Once()
  		// Call started post creation
  		mockAPI.On("GetUser", userID).Return(&model.User{Id: userID}, nil).Once()
@@ -436,7 +436,7 @@ index 8645e99..2b90b3a 100644
  		mockAPI.On("CreatePost", mock.AnythingOfType("*model.Post")).Return(&model.Post{Id: postID}, nil).Once()
  		createPost(t, store, postID, userID, channelID)
  
-@@ -1004,7 +1004,7 @@ func TestHandleJoin(t *testing.T) {
+@@ -1185,7 +1185,7 @@ func TestHandleJoin(t *testing.T) {
  			if i == 0 {
  				// Call started post creation
  				mockAPI.On("GetUser", userID).Return(&model.User{Id: userID}, nil).Once()

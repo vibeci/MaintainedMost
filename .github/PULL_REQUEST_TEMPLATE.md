@@ -9,7 +9,7 @@
 ## How it was tested
 
 <!-- Server version, deployment type, and what you actually ran. "Built and
-uploaded to a MaintainedMost Compose server on Mattermost 11.11.1, started a four
+uploaded to a MaintainedMost Compose server on Mattermost 12.0.0, started a four
 person call" beats "works fine". -->
 
 ## Checklist

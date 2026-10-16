@@ -89,10 +89,10 @@ index bfe7285..cdad59e 100644
  		MaxRecordingDuration: c.MaxRecordingDuration,
 diff --git a/server/maintainedmost_recording_test.go b/server/maintainedmost_recording_test.go
 new file mode 100644
-index 0000000..920b9fb
+index 0000000..0429ee1
 --- /dev/null
 +++ b/server/maintainedmost_recording_test.go
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,254 @@
 +// Copyright (c) 2026-present Mattermore contributors. All Rights Reserved.
 +// See LICENSE.txt for license information.
 +
@@ -282,6 +282,8 @@ index 0000000..920b9fb
 +			}
 +			if tc.wantRequest {
 +				api.On("GetConfig").Return(&model.Config{ServiceSettings: model.ServiceSettings{SiteURL: model.NewPointer("https://mattermost.example")}})
++				// Upstream starts recordings through a dedicated job session since 1.12.4.
++				api.On("CreateSession", mock.Anything).Return(&model.Session{Id: model.NewId(), UserId: botID, Token: model.NewId()}, nil)
 +				api.On("PublishWebSocketEvent", wsEventCallJobState, mock.Anything, mock.Anything)
 +				metrics.On("IncWebSocketEvent", "out", wsEventCallJobState)
 +				if tc.reject {
@@ -346,7 +348,7 @@ index 0000000..920b9fb
 +	}
 +}
 diff --git a/server/recording_api.go b/server/recording_api.go
-index afa5a37..46e6f6f 100644
+index 377a89e..5eade22 100644
 --- a/server/recording_api.go
 +++ b/server/recording_api.go
 @@ -21,7 +21,11 @@ import (
@@ -401,10 +403,10 @@ index afa5a37..46e6f6f 100644
  	if state.Recording != nil && state.Recording.EndAt == 0 {
  		return nil, http.StatusForbidden, fmt.Errorf("recording already in progress")
 diff --git a/server/websocket.go b/server/websocket.go
-index b99b48c..6618415 100644
+index 3c87273..a34e436 100644
 --- a/server/websocket.go
 +++ b/server/websocket.go
-@@ -827,6 +827,13 @@ func (p *Plugin) handleJoin(userID, connID, authSessionID string, joinData calls
+@@ -837,6 +837,13 @@ func (p *Plugin) handleJoin(userID, connID, authSessionID string, joinData calls
  				"owner_id":  state.Call.OwnerID,
  				"host_id":   state.Call.GetHostID(),
  			}, &WebSocketBroadcast{ChannelID: channelID, ReliableClusterSend: true})
@@ -417,4 +419,4 @@ index b99b48c..6618415 100644
 +			}
  		}
  
- 		p.LogDebug("session has joined call",
+ 		if !p.isBot(userID) && channel.Type == model.ChannelTypeDirect {

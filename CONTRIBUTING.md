@@ -72,9 +72,10 @@ advisory, not proof of runtime compatibility.
 
 Review and update the source tag and commit together, and the matching server
 runtime image digest when changing the server. Check plugin minimum-server
-requirements and native dependencies before rebasing patches. Calls source
-1.12.3 is deliberately retained with server 11.11.1: Calls 1.12.5 needs server
-12. Bundle version 1000.12.4 includes fork fixes and is not a source-tag bump.
+requirements and native dependencies before rebasing patches. Calls follows the
+newest stable release compatible with the pinned server: Calls source 1.12.5
+with server 12.0.0. Bundle version 1000.12.5 includes fork fixes and is not a
+source-tag bump.
 
 Run the complete CI gate, test operator migrations, and document remaining
 verification gaps before releasing. Publish the patched transcriber and the

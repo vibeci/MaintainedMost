@@ -12,8 +12,8 @@ MaintainedMost replaces the calls plugin on a self-hosted Mattermost server. It 
 not work on Mattermost Cloud, which allows neither plugin uploads nor custom
 environment variables.
 
-- A compatible self-hosted server. The plugin manifest requires v11.0 or later;
-  the current integration target is the pinned server v11.11.1, not every later
+- A compatible self-hosted server. The plugin manifest requires v12.0 or later;
+  the current integration target is the pinned server v12.0.0, not every later
   release.
 - System administrator access to the System Console
 - Shell or orchestration access for configuration and recovery
@@ -30,10 +30,10 @@ MaintainedMost Server, not this plugin.
 Choose a tested release from this repository's Releases page, or build the
 current pinned source using the [repository instructions](../README.md).
 Download its `maintainedmost-calls-*.tar.gz` and matching
-checksum. For bundle version 1000.12.4, the check is:
+checksum. For bundle version 1000.12.5, the check is:
 
 ```bash
-sha256sum -c maintainedmost-calls-1000.12.4.tar.gz.sha256
+sha256sum -c maintainedmost-calls-1000.12.5.tar.gz.sha256
 ```
 
 Then in Mattermost:
