@@ -532,7 +532,7 @@ index d987eae..a5bc442 100644
          const tracks = [];
          for (const track of this.remoteVoiceTracks) {
 diff --git a/webapp/src/components/call_widget/component.test.tsx b/webapp/src/components/call_widget/component.test.tsx
-index e29cfd4..c33dd97 100644
+index e29cfd4..f137c82 100644
 --- a/webapp/src/components/call_widget/component.test.tsx
 +++ b/webapp/src/components/call_widget/component.test.tsx
 @@ -106,7 +106,6 @@ const props: Props = {
@@ -559,7 +559,15 @@ index e29cfd4..c33dd97 100644
              getLocalScreenStream: () => null,
              on: jest.fn(),
              off: jest.fn(),
-@@ -563,7 +564,6 @@ describe('DM call presentation with video enabled', () => {
+@@ -410,6 +411,7 @@ describe('DM call presentation', () => {
+             getSessionID: () => ownSession.session_id,
+             getRemoteVoiceTracks: () => [],
+             getRemoteScreenStream: () => null,
++            getRemoteVideoStreams: () => new Map(),
+             getLocalScreenStream: () => null,
+             on: jest.fn(),
+             off: jest.fn(),
+@@ -563,7 +565,6 @@ describe('DM call presentation with video enabled', () => {
                      currentSession={sessions.find((s) => s.user_id === 'user-id')}
                      profiles={{'user-id': caller, [calleeID]: callee}}
                      currentUserProfile={caller}
@@ -567,7 +575,15 @@ index e29cfd4..c33dd97 100644
                      enableVideo={true}
                      isDMCalling={sessions.length > 0 && sessions.every((s) => s.user_id === 'user-id')}
                      {...overrides}
-@@ -589,65 +589,42 @@ describe('DM call presentation with video enabled', () => {
+@@ -579,6 +580,7 @@ describe('DM call presentation with video enabled', () => {
+             getSessionID: () => ownSession.session_id,
+             getRemoteVoiceTracks: () => [],
+             getRemoteScreenStream: () => null,
++            getRemoteVideoStreams: () => new Map(),
+             getLocalScreenStream: () => null,
+             on: jest.fn(),
+             off: jest.fn(),
+@@ -589,65 +591,42 @@ describe('DM call presentation with video enabled', () => {
          window.callsClient = undefined;
      });
  
@@ -650,7 +666,7 @@ index e29cfd4..c33dd97 100644
      test('an answered DM call shows the mute badge for a muted caller', () => {
          renderWidget([ownSession, calleeSession]);
  
-@@ -660,19 +637,11 @@ describe('DM call presentation with video enabled', () => {
+@@ -660,19 +639,11 @@ describe('DM call presentation with video enabled', () => {
          expect(within(screen.getByTestId('calls-widget-profile-self')).queryByTestId('calls-widget-profile-mute-state')).not.toBeInTheDocument();
      });
  
@@ -1175,7 +1191,7 @@ index 6190a4f..a41d74f 100644
          isAdmin: isCurrentUserSystemAdmin(state),
          isDMCalling: isCurrentDMCallInCallingState(state),
 diff --git a/webapp/src/components/expanded_view/component.tsx b/webapp/src/components/expanded_view/component.tsx
-index 91d478c..0af9900 100644
+index 91d478c..d1c790b 100644
 --- a/webapp/src/components/expanded_view/component.tsx
 +++ b/webapp/src/components/expanded_view/component.tsx
 @@ -139,12 +139,16 @@ interface Props extends RouteComponentProps {
@@ -1366,7 +1382,7 @@ index 91d478c..0af9900 100644
      }
  
      dismissRecordingPrompt = () => {
-@@ -918,73 +1020,104 @@ export default class ExpandedView extends React.PureComponent<Props, State> {
+@@ -918,73 +1020,106 @@ export default class ExpandedView extends React.PureComponent<Props, State> {
  
      isRingingCallee = () => this.props.isDMCalling && Boolean(this.props.connectedDMUser);
  
@@ -1435,9 +1451,11 @@ index 91d478c..0af9900 100644
 +
 +        // While screen sharing the main area is taken by the shared screen, so
 +        // everyone gets a thumbnail. In speaker view the active speaker is
-+        // rendered large and is left out of the strip.
++        // rendered large and is left out of the strip, unless the main area
++        // shows the ringing placeholder instead of any session.
++        const ringing = this.isRingingCallee();
 +        const sessions = (this.props.currentSession ? [this.props.currentSession, ...this.props.otherSessions] : this.props.otherSessions)
-+            .filter((session) => this.props.screenSharingSession || session.session_id !== activeSessionID);
++            .filter((session) => this.props.screenSharingSession || ringing || session.session_id !== activeSessionID);
  
          return (
              <VideoProfilesTopContainer
@@ -1518,15 +1536,15 @@ index 91d478c..0af9900 100644
              if (!otherProfile) {
                  return null;
              }
-@@ -1011,54 +1144,98 @@ export default class ExpandedView extends React.PureComponent<Props, State> {
+@@ -1011,54 +1146,98 @@ export default class ExpandedView extends React.PureComponent<Props, State> {
                  return renderRingingProfile({aspectRatio: '16/9'});
              }
  
 -            if (!profile || !session) {
 +            const session = sessions.find((s) => s.session_id === activeSessionID);
 +            if (!session) {
-+                return null;
-+            }
+                 return null;
+             }
 +
 +            const isSelf = session.session_id === this.props.currentSession?.session_id;
 +
@@ -1569,8 +1587,8 @@ index 91d478c..0af9900 100644
 +        const renderRingingProfile = (sizing: {width?: string, aspectRatio?: string}) => {
 +            const otherProfile = this.props.connectedDMUser;
 +            if (!otherProfile) {
-                 return null;
-             }
++                return null;
++            }
 +
              return (
                  <VideoProfile
@@ -1655,7 +1673,7 @@ index 91d478c..0af9900 100644
              );
          };
  
-@@ -1912,6 +2089,41 @@ const VideoProfilesTopContainer = styled.div`
+@@ -1912,6 +2091,41 @@ const VideoProfilesTopContainer = styled.div`
      justify-content: center;
      gap: 8px;
      padding: 0px 20px 8px 20px;
@@ -1697,7 +1715,7 @@ index 91d478c..0af9900 100644
  `;
  
  const VideoProfilesContainer = styled.div<{$height: string}>`
-@@ -1929,24 +2141,30 @@ const VideoProfilesContainer = styled.div<{$height: string}>`
+@@ -1929,24 +2143,30 @@ const VideoProfilesContainer = styled.div<{$height: string}>`
      `}
  `;
  
@@ -1735,7 +1753,7 @@ index 91d478c..0af9900 100644
  `;
  
  const VideoProfilePlayer = styled.video<{$mirror: boolean}>`
-@@ -1988,6 +2206,7 @@ type VideoProfileProps = {
+@@ -1988,6 +2208,7 @@ type VideoProfileProps = {
      mirrorVideo: boolean;
      width?: string;
      aspectRatio?: string;
@@ -1743,7 +1761,7 @@ index 91d478c..0af9900 100644
      ringing?: boolean;
      testID?: string;
  };
-@@ -1997,6 +2216,10 @@ const VideoProfile = (props: VideoProfileProps) => {
+@@ -1997,6 +2218,10 @@ const VideoProfile = (props: VideoProfileProps) => {
  
      const MuteIcon = props.isMuted ? MutedIcon : UnmutedIcon;
  
@@ -1754,7 +1772,7 @@ index 91d478c..0af9900 100644
      useEffect(() => {
          if (videoEl && props.stream) {
              videoEl.srcObject = props.stream;
-@@ -2009,9 +2232,9 @@ const VideoProfile = (props: VideoProfileProps) => {
+@@ -2009,9 +2234,9 @@ const VideoProfile = (props: VideoProfileProps) => {
              $aspectRatio={props.aspectRatio}
              data-testid={props.testID}
          >
@@ -1766,7 +1784,7 @@ index 91d478c..0af9900 100644
                  border={false}
                  url={Client4.getProfilePictureUrl(props.profile.id, props.profile.last_picture_update)}
                  borderGlowWidth={props.isSpeaking ? 3 : 0}
-@@ -2020,7 +2243,7 @@ const VideoProfile = (props: VideoProfileProps) => {
+@@ -2020,7 +2245,7 @@ const VideoProfile = (props: VideoProfileProps) => {
              />
              }
  
