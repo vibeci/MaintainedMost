@@ -1,0 +1,86 @@
+name: MaintainedMost Tag Release
+
+# Tags the next release whenever pin changes land on main. The tag push uses
+# the App installation token (not GITHUB_TOKEN) so the Release workflow fires.
+on:
+  push:
+    branches: [main]
+    paths: ['upstream.env']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Override version (vMAJOR.MINOR.PATCH); empty computes it from the pin diff'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintainedmost-tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute the next version
+        id: version
+        env:
+          OVERRIDE: ${{ inputs.version }}
+        run: |
+          latest="$(git tag --list 'v*' | sort -V | tail -n 1)"
+          test -n "$latest" || { echo 'No release tags yet; refusing to guess.' >&2; exit 1; }
+          if [ -n "$OVERRIDE" ]; then
+            version="$OVERRIDE"
+          else
+            git show "${latest}:upstream.env" > "$RUNNER_TEMP/old-upstream.env"
+            if ! version="$(./scripts/next-version.sh "$RUNNER_TEMP/old-upstream.env" upstream.env "$latest")"; then
+              echo 'Pins match the latest release; nothing to tag.'
+              echo "version=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+            echo "Refusing to tag '${version}'" >&2
+            exit 1
+          }
+          if git rev-parse "$version" >/dev/null 2>&1; then
+            echo "Tag ${version} already exists; nothing to do."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Next release: ${version} (previous ${latest})"
+      - name: Check one-time App credentials
+        id: credentials
+        if: steps.version.outputs.version != ''
+        run: |
+          if [ -n "${{ secrets.VIBECI_APP_ID }}" ] && [ -n "${{ secrets.VIBECI_APP_PRIVATE_KEY }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo '::notice::VIBECI_APP_ID / VIBECI_APP_PRIVATE_KEY are not set; see docs/maintenance.md for the one-time setup. Skipping the tag without failing.'
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Mint installation token
+        id: app-token
+        if: steps.version.outputs.version != '' && steps.credentials.outputs.ready == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.VIBECI_APP_ID }}
+          private-key: ${{ secrets.VIBECI_APP_PRIVATE_KEY }}
+      - name: Push the release tag
+        if: steps.version.outputs.version != '' && steps.credentials.outputs.ready == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name 'vibeci-viber[bot]'
+          git config user.email 'vibeci-viber[bot]@users.noreply.github.com'
+          git tag -a "$VERSION" -m "MaintainedMost $VERSION"
+          git push "https://x-access-token:${TOKEN}@github.com/${REPO}.git" "$VERSION"

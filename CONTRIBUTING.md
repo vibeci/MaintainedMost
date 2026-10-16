@@ -70,6 +70,16 @@ A scheduled workflow reports newer stable server/Calls releases and transcriber
 branch commits after checking the full patch series. A clean application is
 advisory, not proof of runtime compatibility.
 
+Mechanical upgrades are automatic: when every patch series applies cleanly and
+every tracked reference syncs (`scripts/bump-pins.sh`), the Upgrade workflow
+opens a bot PR that the full Build gate must pass before the Auto Merge
+workflow merges it. The PR links and closes the advisory issue. Anything
+needing judgment — patch conflicts, stale prose, minimum-server moves — is
+labeled `needs-agent` on the issue and left for an agent run. Merged pin
+changes are tagged automatically (`scripts/next-version.sh` computes the
+version: a server major bump rolls our major, a server/Calls minor bump rolls
+our minor, anything else rolls patch), and the tag triggers the release.
+
 Review and update the source tag and commit together, and the matching server
 runtime image digest when changing the server. Check plugin minimum-server
 requirements and native dependencies before rebasing patches. Calls follows the
@@ -82,11 +92,14 @@ verification gaps before releasing. Publish the patched transcriber and the
 unchanged official recorder in the same offloader-allowed registry namespace
 before the server image. Do not use development-mode allowlist bypasses.
 
-The opt-in [VibeCI integration](docs/maintenance.md) automates compatible updates
-as one manifest-backed patch transaction. It starts disabled and needs separate
-model/image/credential and branch-protection setup. Its patch agent cannot edit
-the fork's workflows, scripts or [required test inventory](maintenance/required-tests.json).
-Retiring a patch/test or changing toolchains requires a reviewed baseline update.
+To force an upgrade attempt outside the schedule, run the Upgrade workflow
+manually; to tag a custom version, run the Tag Release workflow with an
+override. The opt-in [VibeCI integration](docs/maintenance.md) handles
+conflicting rebases as one manifest-backed patch transaction. It starts
+disabled and needs separate model/image/credential and branch-protection
+setup. Its patch agent cannot edit the fork's workflows, scripts or
+[required test inventory](maintenance/required-tests.json). Retiring a
+patch/test or changing toolchains requires a reviewed baseline update.
 
 ## Publishing a fork
 

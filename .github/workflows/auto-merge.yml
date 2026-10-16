@@ -1,0 +1,55 @@
+name: MaintainedMost Auto Merge
+
+# Merges green mechanical-upgrade PRs. The branch ruleset requires a PR plus
+# the three Build contexts with zero approving reviews, so a bot PR whose
+# Build just passed satisfies every rule. Human PRs are never touched.
+on:
+  workflow_run:
+    workflows: ['MaintainedMost Build']
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: maintainedmost-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Merge eligible upgrade PRs
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          case "$HEAD_BRANCH" in
+            bot/upgrade-*) ;;
+            *) echo 'Not an upgrade branch; ignoring.'; exit 0 ;;
+          esac
+          for pr in $(gh pr list -R "$REPO" --state open --head "$HEAD_BRANCH" --json number --jq '.[].number'); do
+            info="$(gh pr view -R "$REPO" "$pr" --json author,headRefOid,mergeable,state)"
+            author="$(printf '%s' "$info" | jq -r .author.login)"
+            case "$author" in
+              github-actions\[bot\]|vibeci-viber\[bot\]) ;;
+              *) echo "PR #$pr is not bot-authored ($author); ignoring."; continue ;;
+            esac
+            test "$(printf '%s' "$info" | jq -r .headRefOid)" = "$HEAD_SHA" || {
+              echo "PR #$pr head moved; waiting for its own Build."
+              continue
+            }
+            if gh pr merge -R "$REPO" "$pr" --merge --delete-branch; then
+              echo "Merged PR #$pr."
+            else
+              echo "Merge blocked (usually behind main); updating the branch for a fresh gate."
+              head="$(printf '%s' "$info" | jq -r .headRefOid)"
+              gh api -X PUT "repos/${REPO}/pulls/${pr}/update-branch" -f expected_head_sha="$head" || true
+            fi
+          done

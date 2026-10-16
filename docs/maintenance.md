@@ -53,6 +53,42 @@ is the full verification gate (the in-sandbox `verify` is only a smoke
 check). Run state lives in the fork under `refs/vibeci/state`, which branch
 protection does not cover; that ref is as trusted as the token holder.
 
+## Release Automation
+
+Pin upgrades and releases run without human clicks through three workflows
+that all attribute publicly to bots:
+
+1. **Detect.** The daily Upstream Check (06:17 UTC) opens or refreshes an
+   `upstream` advisory issue per component after verifying the full patch
+   series against the newest upstream ref.
+2. **Upgrade.** The Upgrade workflow runs after each check (and on manual
+   dispatch) and attempts mechanical bumps in dependency order — server,
+   then Calls, then transcriber — via `scripts/upgrade-attempt.sh` and
+   `scripts/bump-pins.sh`: verify patches, resolve commit/image digests,
+   sync `upstream.env`, the Containerfile default and the tracked prose
+   references, then run the offline test suite. Success opens one bot PR
+   that links and closes the advisory issue; anything needing judgment
+   (patch conflicts, stale references, minimum-server moves) is labeled
+   `needs-agent` on the issue with a summary comment instead.
+3. **Merge.** The Auto Merge workflow merges bot upgrade PRs once the Build
+   gate passes. The branch ruleset requires a PR plus the three strict Build
+   contexts with zero approving reviews, so a green bot PR satisfies every
+   rule; human PRs are never touched.
+4. **Tag and release.** The Tag Release workflow tags the next version
+   whenever pin changes land on `main` and the existing Release workflow
+   builds, publishes and promotes from the tag. `scripts/next-version.sh`
+   computes the version: a server major bump rolls our major, a
+   server/Calls minor bump rolls our minor, anything else rolls patch.
+
+The tag push uses a GitHub App installation token — tags pushed with
+`GITHUB_TOKEN` deliberately do not trigger other workflows. One-time setup:
+add `VIBECI_APP_ID` (the App's numeric id) and `VIBECI_APP_PRIVATE_KEY`
+(its PEM) as repository secrets. Until both exist the tag step skips with
+an annotation instead of failing. Manual overrides: dispatch Upgrade with
+a component subset, or dispatch Tag Release with an explicit version.
+First-time visibility for a brand-new package name still needs clicks in
+the package settings UI; no API exists for that.
+
 ## Update Contract
 
 The daily [maintenance workflow](../.github/workflows/maintain.yml) runs at

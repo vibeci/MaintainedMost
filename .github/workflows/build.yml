@@ -33,7 +33,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
           node --test scripts/tests/*.test.cjs
           for script in scripts/*.sh; do bash -n "$script"; done
-          shellcheck -x -P SCRIPTDIR scripts/lib.sh scripts/build-{server,calls,transcriber,image}.sh scripts/test-{component,offloader}.sh scripts/check-upstream.sh scripts/check-public-images.sh
+          shellcheck -x -P SCRIPTDIR scripts/lib.sh scripts/build-{server,calls,transcriber,image}.sh scripts/test-{component,offloader}.sh scripts/check-upstream.sh scripts/check-public-images.sh scripts/next-version.sh scripts/bump-pins.sh scripts/upgrade-attempt.sh
           source upstream.env
           export GOTOOLCHAIN="go$GO_VERSION"
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml

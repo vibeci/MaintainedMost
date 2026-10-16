@@ -1,0 +1,106 @@
+name: MaintainedMost Upgrade
+
+# Mechanical upgrades only: if every patch series applies cleanly onto the new
+# pins and every reference syncs, open a PR for the normal Build gate. Anything
+# needing judgment (conflicts, stale prose, minimum-server moves) is labeled
+# needs-agent on the advisory issue and left alone.
+on:
+  workflow_run:
+    workflows: ['MaintainedMost Upstream Check']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      components:
+        description: 'Space-separated subset of: server calls transcriber (default: all)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: maintainedmost-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Attempt component upgrades
+        id: attempt
+        env:
+          COMPONENTS: ${{ inputs.components }}
+        run: |
+          git config user.name 'vibeci-viber[bot]'
+          git config user.email 'vibeci-viber[bot]@users.noreply.github.com'
+          test -z "$(git status --porcelain)" || { echo 'tree is not clean' >&2; exit 1; }
+          components="${COMPONENTS:-server calls transcriber}"
+          results="$RUNNER_TEMP/upgrade-results.tsv"
+          : > "$results"
+          # shellcheck disable=SC2086
+          for component in $components; do
+            ./scripts/upgrade-attempt.sh "$component" "$results"
+          done
+          {
+            echo "results<<EOF"
+            cat "$results"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          printf '%s\n' "results-file=$results" >> "$GITHUB_OUTPUT"
+      - name: Fast offline validation
+        if: contains(steps.attempt.outputs.results, 'bumped')
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+      - name: Open upgrade PR
+        if: contains(steps.attempt.outputs.results, 'bumped')
+        env:
+          RESULTS: ${{ steps.attempt.outputs.results }}
+        run: |
+          slug="$(printf '%s' "$RESULTS" | awk -F'\t' '$2 == "bumped" {printf "%s-%s_", $1, $4}')"
+          branch="bot/upgrade-$(date -u +%Y%m%d)-${slug%_}"
+          if gh pr list --state open --json headRefName --jq '.[].headRefName' | grep -q '^bot/upgrade-'; then
+            echo 'An upgrade PR is already open; leaving it alone.'
+            exit 0
+          fi
+          git checkout -b "$branch"
+          git add -A
+          git commit -m "Mechanical upgrade: ${slug%_}" -m "$(printf '%s' "$RESULTS" | awk -F'\t' '$2 == "bumped" {printf "%s: %s -> %s (%s)\n", $1, $3, $4, $5}')"
+          git push -u origin "$branch"
+          body="$(printf '%s' "$RESULTS" | awk -F'\t' '$2 == "bumped" {printf "- %s: %s -> %s (%s)\n", $1, $3, $4, $5}')"
+          closes="$(for key in SERVER_TAG CALLS_TAG TRANSCRIBER_TAG; do
+            gh issue list --label upstream --state open --json number,body \
+              --jq ".[] | select(.body | contains(\"maintainedmost-upstream:${key}\")) | .number" |
+            sed 's/^/Closes #/';
+          done)"
+          gh pr create --title "Mechanical upgrade: ${slug%_}" --body "Automated mechanical upgrade. Every patch series applies cleanly and every tracked reference is synced; the full Build gate must pass before merge.
+
+          $body
+
+          $closes"
+      - name: Route conflicts to an agent
+        if: contains(steps.attempt.outputs.results, 'needs-agent')
+        env:
+          RESULTS: ${{ steps.attempt.outputs.results }}
+        run: |
+          gh label create needs-agent --color fbca04 --description 'Needs agent judgment' 2>/dev/null || true
+          declare -A key_for=([server]=SERVER_TAG [calls]=CALLS_TAG [transcriber]=TRANSCRIBER_TAG)
+          while IFS=$'\t' read -r component status old new detail; do
+            test "$status" = needs-agent || continue
+            key="${key_for[$component]}"
+            number="$(gh issue list --label upstream --state open --json number,body \
+              --jq ".[] | select(.body | contains(\"maintainedmost-upstream:${key}\")) | .number" | head -n 1)"
+            test -n "$number" || continue
+            gh issue edit "$number" --add-label needs-agent
+            gh issue comment "$number" --body "Mechanical upgrade cannot proceed for \`${component}\` (${old:-?} -> ${new:-?}): ${detail}. An agent needs to rebase the patch series."
+          done <<< "$RESULTS"
