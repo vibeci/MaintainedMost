@@ -51,7 +51,7 @@ permissions still apply.
 ships a prepackaged copy of official Calls and installs it if it looks newer.
 The high version avoids replacement by lower-versioned official bundles; it
 does not guarantee future server compatibility. The current bundle is
-1000.12.5 from Calls source 1.12.5, with fork-only fixes advancing the bundle.
+1000.12.6 from Calls source 1.12.6, with fork-only fixes advancing the bundle.
 
 **The repo holds ordered patches against immutable pins.** A conflict fails the
 build; patches are never silently dropped. Server 12.0.0 is pinned to a commit

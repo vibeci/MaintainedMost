@@ -57,7 +57,7 @@ or authorization rules for an uploaded or downloaded replacement. See
 
 ## Version numbers
 
-The current bundle version is **1000.12.5**, built from Calls source **1.12.5**.
+The current bundle version is **1000.12.6**, built from Calls source **1.12.6**.
 Fork-only fixes also advance the bundle version, so its suffix is not an exact
 upstream source version. Consult `CALLS_TAG`, `CALLS_COMMIT` and `CALLS_VERSION`
 in [`upstream.env`](../upstream.env) at the selected release.
@@ -75,7 +75,7 @@ protect against an explicit administrator replacement.
 ## Upgrading the server image
 
 Current source pins are server 12.0.0 with a matching commit/image digest,
-Calls 1.12.5 and transcriber c09a9a3. Calls follows the newest stable release
+Calls 1.12.6 and transcriber c09a9a3. Calls follows the newest stable release
 compatible with the pinned server. Maintainers must review tags, commits and
 the runtime image together; a patch conflict fails the build, never silently
 drops a patch.

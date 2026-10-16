@@ -80,7 +80,7 @@ A green badge is reassuring. We prefer it to mean the tests ran, rather than
 that the patch files were successfully located.
 
 [`upstream.env`](upstream.env) is authoritative. The current baseline is server
-**12.0.0**, Calls source **1.12.5** with bundle **1000.12.5**, and transcriber
+**12.0.0**, Calls source **1.12.6** with bundle **1000.12.6**, and transcriber
 commit **c09a9a3**. Calls tracks the newest stable release compatible with the
 pinned server.
 

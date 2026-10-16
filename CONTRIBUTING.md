@@ -83,8 +83,8 @@ our minor, anything else rolls patch), and the tag triggers the release.
 Review and update the source tag and commit together, and the matching server
 runtime image digest when changing the server. Check plugin minimum-server
 requirements and native dependencies before rebasing patches. Calls follows the
-newest stable release compatible with the pinned server: Calls source 1.12.5
-with server 12.0.0. Bundle version 1000.12.5 includes fork fixes and is not a
+newest stable release compatible with the pinned server: Calls source 1.12.6
+with server 12.0.0. Bundle version 1000.12.6 includes fork fixes and is not a
 source-tag bump.
 
 Run the complete CI gate, test operator migrations, and document remaining

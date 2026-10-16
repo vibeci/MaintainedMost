@@ -15,7 +15,7 @@ The actual source licence files say otherwise:
 - [Mattermost server 12.0.0](https://github.com/mattermost/mattermost/blob/1f5e0e9ba40da7ba0741659346e0a385a623d6a4/LICENSE.txt#L9-L15)
   grants use under the Free Software Foundation's **GNU AGPL v3.0**, subject to
   its listed exceptions, or under a commercial licence.
-- [Calls 1.12.5](https://github.com/mattermost/mattermost-plugin-calls/blob/24414f57bca4332e53addc73dbbfa832e0b4d895/LICENSE.txt#L9-L14)
+- [Calls 1.12.6](https://github.com/mattermost/mattermost-plugin-calls/blob/b8a43a461f6a15ebd5229d08098a34b71f659b3c/LICENSE.txt#L9-L14)
   likewise explicitly names **GNU AGPL v.3.0** or a commercial licence.
 - Mattermost's [first published LICENSE.txt in June 2015](https://github.com/mattermost/mattermost/blob/3c5760f5a298d701035d4d3ee3abbb626c614970/LICENSE.txt)
   already named GNU AGPL v3.0. The server 11.11.0 licence used by the original

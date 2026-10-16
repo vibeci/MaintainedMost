@@ -3,8 +3,8 @@
 ## Version scope
 
 The maintained source baseline is the patch series and immutable pins in
-[`upstream.env`](upstream.env): currently server 12.0.0, Calls source 1.12.5
-(bundle 1000.12.5) and transcriber commit c09a9a3. Check that file at the release
+[`upstream.env`](upstream.env): currently server 12.0.0, Calls source 1.12.6
+(bundle 1000.12.6) and transcriber commit c09a9a3. Check that file at the release
 tag you deploy for full commits and the matching server image digest. Older
 builds and other upstream combinations are not covered by the current CI gate.
 Monitor upstream advisories as well as this repository's releases; a passing

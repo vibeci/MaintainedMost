@@ -1,5 +1,5 @@
 diff --git a/plugin.json b/plugin.json
-index 400d140..756ff6d 100644
+index fbfe90b..559d57b 100644
 --- a/plugin.json
 +++ b/plugin.json
 @@ -229,6 +229,13 @@
@@ -16,22 +16,8 @@ index 400d140..756ff6d 100644
            {
              "key": "JobServiceURL",
              "display_name": "Job service URL",
-@@ -535,6 +542,13 @@
-         "default": false,
-         "help_text": "(Optional) When set to true, call recordings are enabled."
-       },
-+      {
-+        "key": "RecordCallsByDefault",
-+        "display_name": "Record calls automatically",
-+        "type": "bool",
-+        "default": false,
-+        "help_text": "(Optional) When set to true, every call starts recording as soon as it begins, without anyone pressing the button. Participants still see the recording banner. Recording people without telling them is a legal question in many places, so leave this off unless you know where you stand. Requires call recordings to be enabled."
-+      },
-       {
-         "key": "JobServiceURL",
-         "display_name": "Job service URL",
 diff --git a/server/configuration.go b/server/configuration.go
-index bfe7285..cdad59e 100644
+index ebf8ed7..0464956 100644
 --- a/server/configuration.go
 +++ b/server/configuration.go
 @@ -118,6 +118,11 @@ type ClientConfig struct {

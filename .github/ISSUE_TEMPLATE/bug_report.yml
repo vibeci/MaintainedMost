@@ -53,7 +53,7 @@ body:
     attributes:
       label: MaintainedMost plugin version
       description: System Console > Plugins > Plugin Management, next to Calls.
-      placeholder: "1000.12.5"
+      placeholder: "1000.12.6"
     validations:
       required: true
 

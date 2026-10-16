@@ -30,10 +30,10 @@ MaintainedMost Server, not this plugin.
 Choose a tested release from this repository's Releases page, or build the
 current pinned source using the [repository instructions](../README.md).
 Download its `maintainedmost-calls-*.tar.gz` and matching
-checksum. For bundle version 1000.12.5, the check is:
+checksum. For bundle version 1000.12.6, the check is:
 
 ```bash
-sha256sum -c maintainedmost-calls-1000.12.5.tar.gz.sha256
+sha256sum -c maintainedmost-calls-1000.12.6.tar.gz.sha256
 ```
 
 Then in Mattermost:
