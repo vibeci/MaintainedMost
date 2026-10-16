@@ -692,7 +692,7 @@ index e3a403f..f137c82 100644
  
      test('a ringing DM call with video disabled keeps the audio-only header and renders no tiles', () => {
 diff --git a/webapp/src/components/call_widget/component.tsx b/webapp/src/components/call_widget/component.tsx
-index 79e2f09..5b0d9c9 100644
+index 79e2f09..0d10275 100644
 --- a/webapp/src/components/call_widget/component.tsx
 +++ b/webapp/src/components/call_widget/component.tsx
 @@ -53,7 +53,7 @@ import VideoOnIcon from 'src/components/icons/video_on';
@@ -823,7 +823,7 @@ index 79e2f09..5b0d9c9 100644
      private getGlobalWidgetBounds = () => {
          const bounds = {
              width: 0,
-@@ -2278,96 +2325,55 @@ export default class CallWidget extends React.PureComponent<Props, State> {
+@@ -2278,92 +2325,61 @@ export default class CallWidget extends React.PureComponent<Props, State> {
          );
      };
  
@@ -833,28 +833,15 @@ index 79e2f09..5b0d9c9 100644
 -        const selfProfile = this.props.profiles[this.props.currentUserID];
 -        const otherProfile = this.props.connectedDMUser;
 -        const otherSession = this.props.otherSessions.find((s) => s.video);
-+    renderProfiles = () => {
-+        const sessions = this.getCallSessions();
-+        const videoView = sessions.some((session) => session.video) || this.state.initializingSelfVideo;
-+        const selfOnly = this.props.otherSessions.length === 0;
-+        const mirrorSelfVideo = localStorage.getItem(STORAGE_CALLS_MIRROR_VIDEO_KEY) === 'true';
++    getCallSessions = () => {
++        return this.props.currentSession ? [...this.props.otherSessions, this.props.currentSession] : this.props.otherSessions;
++    };
  
-         return (
-             <div
+-        return (
+-            <div
 -                className='calls-widget-video-container'
 -                style={this.style.videoContainer}
-+                className='calls-widget-profiles'
-+                style={{
-+                    display: 'flex',
-+                    flexWrap: 'wrap',
-+                    gap: '8px',
-+                    alignItems: 'center',
-+                    justifyContent: 'center',
-+                    width: '100%',
-+                    maxHeight: '168px',
-+                    overflowY: 'auto',
-+                }}
-             >
+-            >
 -                { selfProfile && this.props.currentSession &&
 -                    <CallsDMVideoPlayer
 -                        stream={this.state.selfVideoStream}
@@ -874,9 +861,14 @@ index 79e2f09..5b0d9c9 100644
 -                }
 -            </div>
 -        );
--    };
--
--    renderProfiles = () => {
++    getSessionVideoStream = (session: UserSessionState) => {
++        if (session.session_id === this.props.currentSession?.session_id) {
++            return this.state.selfVideoStream;
++        }
++        return this.state.remoteVideoStreams[session.session_id] ?? null;
+     };
+ 
+     renderProfiles = () => {
 -        // Here we are assuming this only renders in a DM which is the case
 -        // right now.
 -        const selfProfile = this.props.profiles[this.props.currentUserID] || this.props.currentUserProfile;
@@ -886,8 +878,12 @@ index 79e2f09..5b0d9c9 100644
 -        const videoView = (otherSession?.video || selfSession?.video) ?? false;
 -        const calleePending = (this.props.clientConnecting || this.props.isDMCalling) && Boolean(otherProfile);
 -        const selfOnly = this.props.otherSessions.length === 0 && !calleePending;
--
--        return (
++        const sessions = this.getCallSessions();
++        const videoView = sessions.some((session) => session.video) || this.state.initializingSelfVideo;
++        const selfOnly = this.props.otherSessions.length === 0;
++        const mirrorSelfVideo = localStorage.getItem(STORAGE_CALLS_MIRROR_VIDEO_KEY) === 'true';
+ 
+         return (
 -            <div className='calls-widget-profiles'>
 -                { selfProfile && (selfSession || this.props.clientConnecting) &&
 -                <CallsWidgetProfile
@@ -916,6 +912,19 @@ index 79e2f09..5b0d9c9 100644
 -                    testID='calls-widget-profile-ringing'
 -                />
 -                }
++            <div
++                className='calls-widget-profiles'
++                style={{
++                    display: 'flex',
++                    flexWrap: 'wrap',
++                    gap: '8px',
++                    alignItems: 'center',
++                    justifyContent: 'center',
++                    width: '100%',
++                    maxHeight: '168px',
++                    overflowY: 'auto',
++                }}
++            >
 +                {sessions.map((session) => {
 +                    const isSelf = session.session_id === this.props.currentSession?.session_id;
 +                    const profile = isSelf
@@ -955,12 +964,7 @@ index 79e2f09..5b0d9c9 100644
              </div>
          );
      };
- 
-+
-     renderMiddleBar = () => {
-         return (
-             <div
-@@ -2447,8 +2453,6 @@ export default class CallWidget extends React.PureComponent<Props, State> {
+@@ -2447,8 +2463,6 @@ export default class CallWidget extends React.PureComponent<Props, State> {
          // A ringing DM call hasn't been answered yet, so hanging up cancels it rather than leaving it.
          const leaveMenuLabel = this.props.isDMCalling ? formatMessage({defaultMessage: 'Cancel call'}) : formatMessage({defaultMessage: 'Leave call'});
  
@@ -969,7 +973,7 @@ index 79e2f09..5b0d9c9 100644
          return (
              <div
                  id='calls-widget'
-@@ -2540,8 +2544,6 @@ export default class CallWidget extends React.PureComponent<Props, State> {
+@@ -2540,8 +2554,6 @@ export default class CallWidget extends React.PureComponent<Props, State> {
  
                      {this.props.enableVideo && this.renderTopBar() }
  
@@ -978,7 +982,7 @@ index 79e2f09..5b0d9c9 100644
                      {this.props.enableVideo && this.renderMiddleBar() }
  
                      <div
-@@ -2719,123 +2721,9 @@ const LeaveCallButton = styled(DotMenuButton)<{ $isActive: boolean }>`
+@@ -2719,123 +2731,9 @@ const LeaveCallButton = styled(DotMenuButton)<{ $isActive: boolean }>`
      }
  `;
  
@@ -1105,7 +1109,7 @@ index 79e2f09..5b0d9c9 100644
  const WidgetProfileContainer = styled.div<{$videoView: boolean, $singleSession?: boolean}>`
    display: flex;
    position: relative;
-@@ -2843,7 +2731,8 @@ const WidgetProfileContainer = styled.div<{$videoView: boolean, $singleSession?:
+@@ -2843,7 +2741,8 @@ const WidgetProfileContainer = styled.div<{$videoView: boolean, $singleSession?:
    align-items: center;
    background: #E4EBFA;
    border-radius: 4px;
@@ -1115,7 +1119,7 @@ index 79e2f09..5b0d9c9 100644
  
    ${({$videoView, $singleSession}) => $videoView && !$singleSession && css`
      aspect-ratio: 1;
-@@ -2895,6 +2784,10 @@ type CallsWidgetProfileProps = {
+@@ -2895,6 +2794,10 @@ type CallsWidgetProfileProps = {
  const CallsWidgetProfile = (props: CallsWidgetProfileProps) => {
      const MuteIcon = props.isMuted ? MutedIcon : UnmutedIcon;
  
@@ -1126,7 +1130,7 @@ index 79e2f09..5b0d9c9 100644
      const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
      const videoElRefCb = (el: HTMLVideoElement | null) => {
          if (el) {
-@@ -2915,7 +2808,7 @@ const CallsWidgetProfile = (props: CallsWidgetProfileProps) => {
+@@ -2915,7 +2818,7 @@ const CallsWidgetProfile = (props: CallsWidgetProfileProps) => {
              data-testid={props.testID}
          >
  
@@ -1135,7 +1139,7 @@ index 79e2f09..5b0d9c9 100644
              <Avatar
                  size={40}
                  border={false}
-@@ -2926,7 +2819,7 @@ const CallsWidgetProfile = (props: CallsWidgetProfileProps) => {
+@@ -2926,7 +2829,7 @@ const CallsWidgetProfile = (props: CallsWidgetProfileProps) => {
              />
              }
  
