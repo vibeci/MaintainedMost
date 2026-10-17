@@ -1,0 +1,10 @@
+{
+  "commit": "874691132405e62f8f7bf141972a2518cdecbae7",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Updates patches to enable calls/video by default, disable the AI plugin by default, and hide Enterprise badges in settings.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383832369Z"
+}

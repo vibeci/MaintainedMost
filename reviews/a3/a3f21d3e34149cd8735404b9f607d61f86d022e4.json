@@ -1,0 +1,10 @@
+{
+  "commit": "a3f21d3e34149cd8735404b9f607d61f86d022e4",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Update calls patches so configuration defaults are properly applied.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934937612Z"
+}

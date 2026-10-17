@@ -1,0 +1,17 @@
+{
+  "commit": "50b5cf155a8c975480103a2052aca1375d834ebc",
+  "verdict": "clean",
+  "confidence": 0.98,
+  "summary": "Adds Docker Compose configuration, documentation, and a patch to automatically enable call recording when a job service is configured.",
+  "signals": [
+    {
+      "kind": "new_urls",
+      "file": "compose.yaml",
+      "detail": "hosts referenced in added code: calls-offloader"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383833471Z"
+}

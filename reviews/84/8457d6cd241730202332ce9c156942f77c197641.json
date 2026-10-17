@@ -1,0 +1,17 @@
+{
+  "commit": "8457d6cd241730202332ce9c156942f77c197641",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Pin base container image to upstream version and update upgrade documentation.",
+  "signals": [
+    {
+      "kind": "build_config",
+      "file": "Containerfile",
+      "detail": "build, packaging or install configuration changed"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-13T22:51:19.083714619Z"
+}

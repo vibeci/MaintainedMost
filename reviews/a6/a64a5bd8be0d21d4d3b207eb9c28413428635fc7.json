@@ -1,0 +1,22 @@
+{
+  "commit": "a64a5bd8be0d21d4d3b207eb9c28413428635fc7",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Update documentation and project links on the roadmap and feature pages.",
+  "signals": [
+    {
+      "kind": "new_urls",
+      "file": "site/src/components/SiteFooter.astro",
+      "detail": "hosts referenced in added code: github.com"
+    },
+    {
+      "kind": "new_urls",
+      "file": "site/src/layouts/FeatureLayout.astro",
+      "detail": "hosts referenced in added code: github.com"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934935378Z"
+}

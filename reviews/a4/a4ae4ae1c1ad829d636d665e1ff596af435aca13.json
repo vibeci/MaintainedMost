@@ -1,0 +1,22 @@
+{
+  "commit": "a4ae4ae1c1ad829d636d665e1ff596af435aca13",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Add CI build workflow for pull requests and fix a compilation issue in patch 0006.",
+  "signals": [
+    {
+      "kind": "ci_config",
+      "file": ".github/workflows/build.yml",
+      "detail": "CI/CD configuration changed (runs with repository secrets)"
+    },
+    {
+      "kind": "new_urls",
+      "file": ".github/workflows/build.yml",
+      "detail": "hosts referenced in added code: github.com"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934938113Z"
+}

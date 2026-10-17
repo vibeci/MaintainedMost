@@ -1,0 +1,36 @@
+{
+  "repo": "maintainedmost",
+  "last_upstream_tip": "7a44ede289d26809517a1fd1a73ccb563bea3149",
+  "last_fork_head": "953e0f14a0553224d17f07f18db9bd934a4c3511",
+  "last_result": "dry-run",
+  "last_message": "unchanged since the dry run at 2026-10-17T15:55:35Z; would push c7d7004147",
+  "last_job": "maintainedmost-20261017-154121-1bddbe",
+  "last_attempt": "2026-10-17T20:41:10.103311547Z",
+  "failure": {
+    "kind": "failed",
+    "fork_head": "953e0f14a0553224d17f07f18db9bd934a4c3511",
+    "target": "7a44ede289d26809517a1fd1a73ccb563bea3149",
+    "count": 1,
+    "streak": 5,
+    "first_at": "2026-10-17T10:54:00.538758023Z",
+    "last_at": "2026-10-17T10:54:00.538758023Z",
+    "next_retry": "2026-10-17T11:20:58.497779188Z",
+    "error": "could not produce an acceptable merge: inferhub-flash-high: llm call: llm api error (HTTP 402): no_provider_under_bid: every provider within your price limit is busy or rate-limited right now; 50 provider(s) priced above your limit are available — raise your max price (or lower min_discount_pct) to use them",
+    "alerted": true
+  },
+  "proposal": {
+    "base": "953e0f14a0553224d17f07f18db9bd934a4c3511",
+    "upstream": "7a44ede289d26809517a1fd1a73ccb563bea3149",
+    "target": "7a44ede289d26809517a1fd1a73ccb563bea3149",
+    "commit": "c7d70041478a7133d4cbdc74f20eb85745452414",
+    "job_id": "maintainedmost-20261017-154121-1bddbe",
+    "time": "2026-10-17T15:55:35.218932006Z"
+  },
+  "usage": {
+    "input_tokens": 61777896,
+    "output_tokens": 160170,
+    "cache_read_tokens": 52044191,
+    "cache_write_tokens": 0,
+    "calls": 873
+  }
+}

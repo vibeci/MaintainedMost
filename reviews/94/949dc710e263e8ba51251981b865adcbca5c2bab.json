@@ -1,0 +1,10 @@
+{
+  "commit": "949dc710e263e8ba51251981b865adcbca5c2bab",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Add retry logic for calls job service initialization and update configuration docs.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-13T14:20:02.667197075Z"
+}

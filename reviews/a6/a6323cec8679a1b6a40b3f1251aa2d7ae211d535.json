@@ -1,0 +1,187 @@
+{
+  "commit": "a6323cec8679a1b6a40b3f1251aa2d7ae211d535",
+  "verdict": "clean",
+  "confidence": 0.98,
+  "summary": "Rebrands Mattermost logos, favicons, links, and default configuration to Mattermore.",
+  "signals": [
+    {
+      "kind": "build_config",
+      "file": "Containerfile",
+      "detail": "build, packaging or install configuration changed"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/android-chrome-192x192.png",
+      "detail": "image, 5708 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-120x120.png",
+      "detail": "image, 3531 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-144x144.png",
+      "detail": "image, 4187 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-152x152.png",
+      "detail": "image, 4479 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-57x57.png",
+      "detail": "image, 1688 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-60x60.png",
+      "detail": "image, 1736 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-72x72.png",
+      "detail": "image, 2053 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/apple-touch-icon-76x76.png",
+      "detail": "image, 2155 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-16x16.png",
+      "detail": "image, 502 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-32x32.png",
+      "detail": "image, 942 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-96x96.png",
+      "detail": "image, 2657 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-default-16x16.png",
+      "detail": "image, 502 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-default-24x24.png",
+      "detail": "image, 696 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-default-32x32.png",
+      "detail": "image, 942 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-default-64x64.png",
+      "detail": "image, 1835 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-default-96x96.png",
+      "detail": "image, 2657 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-mentions-16x16.png",
+      "detail": "image, 571 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-mentions-24x24.png",
+      "detail": "image, 795 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-mentions-32x32.png",
+      "detail": "image, 1065 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-mentions-64x64.png",
+      "detail": "image, 2100 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-mentions-96x96.png",
+      "detail": "image, 3122 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-unread-16x16.png",
+      "detail": "image, 580 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-unread-24x24.png",
+      "detail": "image, 817 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-unread-32x32.png",
+      "detail": "image, 1073 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-unread-64x64.png",
+      "detail": "image, 2156 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/favicon/favicon-unread-96x96.png",
+      "detail": "image, 3226 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logo-email.png",
+      "detail": "image, 8031 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logo.png",
+      "detail": "image, 14526 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logoWhite.png",
+      "detail": "image, 5064 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logo_email_blue.png",
+      "detail": "image, 7225 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logo_email_dark.png",
+      "detail": "image, 7225 bytes"
+    },
+    {
+      "kind": "binary_added",
+      "file": "brand/images/logo_email_gray.png",
+      "detail": "image, 3080 bytes"
+    },
+    {
+      "kind": "very_long_lines",
+      "file": "patches/server/0008-mattermore-branding.patch",
+      "detail": "2 added line(s) longer than 1000 characters (minified/generated/obfuscated?)"
+    },
+    {
+      "kind": "new_urls",
+      "file": "patches/server/0009-point-links-at-mattermore.patch",
+      "detail": "hosts referenced in added code: apps.apple.com, github.com, mattermore.dev, mattermost.com, play.google.com"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383831327Z"
+}

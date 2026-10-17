@@ -1,0 +1,172 @@
+{
+  "commit": "3cdbf9a111da10ddb5b77b386243aee8bcd4f59a",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Updates SVG and PNG brand assets and logo components to use a consistent masked circle design.",
+  "signals": [
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/android-chrome-192x192.png",
+      "detail": "image, 4762 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-120x120.png",
+      "detail": "image, 3453 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-144x144.png",
+      "detail": "image, 4249 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-152x152.png",
+      "detail": "image, 4584 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-57x57.png",
+      "detail": "image, 1601 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-60x60.png",
+      "detail": "image, 1696 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-72x72.png",
+      "detail": "image, 1996 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/apple-touch-icon-76x76.png",
+      "detail": "image, 2227 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-16x16.png",
+      "detail": "image, 488 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-32x32.png",
+      "detail": "image, 925 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-96x96.png",
+      "detail": "image, 2831 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-default-16x16.png",
+      "detail": "image, 488 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-default-24x24.png",
+      "detail": "image, 699 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-default-32x32.png",
+      "detail": "image, 925 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-default-64x64.png",
+      "detail": "image, 1574 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-default-96x96.png",
+      "detail": "image, 2831 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-mentions-16x16.png",
+      "detail": "image, 561 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-mentions-24x24.png",
+      "detail": "image, 810 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-mentions-32x32.png",
+      "detail": "image, 1054 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-mentions-64x64.png",
+      "detail": "image, 1890 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-mentions-96x96.png",
+      "detail": "image, 3309 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-unread-16x16.png",
+      "detail": "image, 568 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-unread-24x24.png",
+      "detail": "image, 826 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-unread-32x32.png",
+      "detail": "image, 1057 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-unread-64x64.png",
+      "detail": "image, 1938 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/favicon/favicon-unread-96x96.png",
+      "detail": "image, 3410 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logo-email.png",
+      "detail": "image, 6533 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logo.png",
+      "detail": "image, 12116 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logoWhite.png",
+      "detail": "image, 3891 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logo_email_blue.png",
+      "detail": "image, 5933 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logo_email_dark.png",
+      "detail": "image, 5933 bytes"
+    },
+    {
+      "kind": "binary_changed",
+      "file": "brand/images/logo_email_gray.png",
+      "detail": "image, 2252 bytes"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383834944Z"
+}
