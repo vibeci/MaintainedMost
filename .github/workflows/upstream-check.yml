@@ -45,7 +45,7 @@ jobs:
           script: |
             await require('./scripts/upstream-alert.cjs')({github, context});
       - name: Propagate verification failures
-        if: always() && steps.check.outcome == 'failure'
+        if: always() && steps.check.outcome == 'failure' && !steps.check.outputs.verification
         run: |
           echo 'Upstream verification failed. Network/checkout errors are not patch incompatibility alerts.' >&2
           exit 1

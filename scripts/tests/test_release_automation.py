@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 BASE_ENV = {
     # Mirrors the live pins so the copied prose files match the fixture.
-    "SERVER_TAG": "v12.0.0",
-    "SERVER_COMMIT": "1f5e0e9ba40da7ba0741659346e0a385a623d6a4",
-    "SERVER_IMAGE": "docker.io/mattermost/mattermost-team-edition:12.0.0@sha256:c213d4eb01c2973a3814f57dab4e0629287b92896cb2f98d27134aa62ee5c3cc",
+    "SERVER_TAG": "v12.0.1",
+    "SERVER_COMMIT": "987e57120dca630dadbcd2638064ab66a02bb81e",
+    "SERVER_IMAGE": "docker.io/mattermost/mattermost-team-edition:12.0.1@sha256:8ca1050cb8a2ec1ec0be5aff90ee40aa03e134f48443f7526b7b2b18872cf31b",
     "CALLS_TAG": "v1.12.5",
     "CALLS_COMMIT": "24414f57bca4332e53addc73dbbfa832e0b4d895",
     "RECORDER_TAG": "v0.8.13",

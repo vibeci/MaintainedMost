@@ -4,7 +4,7 @@
 # binary, the web app, and the calls plugin.
 
 # Kept in sync with upstream.env; build-image.sh passes this explicitly too.
-ARG SERVER_IMAGE=docker.io/mattermost/mattermost-team-edition:12.0.0@sha256:c213d4eb01c2973a3814f57dab4e0629287b92896cb2f98d27134aa62ee5c3cc
+ARG SERVER_IMAGE=docker.io/mattermost/mattermost-team-edition:12.0.1@sha256:8ca1050cb8a2ec1ec0be5aff90ee40aa03e134f48443f7526b7b2b18872cf31b
 FROM ${SERVER_IMAGE} AS upstream
 
 # The guest administration screens and the licence badges live in the web app,

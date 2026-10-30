@@ -1,12 +1,27 @@
 // Called by actions/github-script; kept separate so issue handling can be tested offline.
 module.exports = async ({github, context, env = process.env}) => {
     const {REPO, KEY, CURRENT, NEW_REF, VERIFICATION, MIN_SERVER, SERVER_TAG, BRANCH} = env;
-    if (!['clean', 'conflict'].includes(VERIFICATION)) {
-        throw new Error('Refusing an upstream alert without a completed patch check');
-    }
     const target = {owner: context.repo.owner, repo: context.repo.repo};
     const begin = `<!-- maintainedmost-upstream:${KEY} -->`;
     const end = '<!-- /maintainedmost-upstream -->';
+
+    // An advisory whose version already matches the pin is stale: close it.
+    if (VERIFICATION === 'unchanged' || VERIFICATION === 'held') {
+        const held = VERIFICATION === 'held';
+        const issues = await github.paginate(github.rest.issues.listForRepo, {...target, state: 'open', per_page: 100});
+        const stale = issues.filter((issue) => !issue.pull_request && issue.body?.includes(begin));
+        for (const issue of stale) {
+            const note = held
+                ? `Upstream moved, but the \`${KEY}\` pin is deliberately held (\`${KEY.replace(/_TAG$/, '')}_HOLD=1\` in \`upstream.env\`); this alert is closed while the hold lasts.`
+                : `\`${KEY}\` already pins this version; the upgrade shipped. Closing this advisory.`;
+            await github.rest.issues.createComment({...target, issue_number: issue.number, body: note});
+            await github.rest.issues.update({...target, issue_number: issue.number, state: 'closed'});
+        }
+        return;
+    }
+    if (!['clean', 'conflict'].includes(VERIFICATION)) {
+        throw new Error('Refusing an upstream alert without a completed patch check');
+    }
     const title = BRANCH ? `${REPO} ${BRANCH} advanced to ${NEW_REF.slice(0, 12)}` : `${REPO} ${NEW_REF} is available`;
     const result = VERIFICATION === 'clean'
         ? 'The complete patch series applies sequentially. This is not a build, test, or compatibility verdict.'

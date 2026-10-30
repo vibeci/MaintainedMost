@@ -45,6 +45,12 @@ if [ "$latest" = "$current" ]; then
     output verification unchanged
     exit 0
 fi
+hold_var="$(echo "$component" | tr '[:lower:]' '[:upper:]')_HOLD"
+if [ "${!hold_var:-}" = 1 ]; then
+    output verification held
+    echo "pin held: upstream moved but ${hold_var}=1 (see upstream.env)" >&2
+    exit 0
+fi
 output new_ref "$latest"
 
 patches=("$ROOT/patches/$component"/*.patch)

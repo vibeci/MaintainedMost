@@ -38,14 +38,19 @@ else
     exit 1
 fi
 
-value() { grep -E "^$1=" "$check_out" | tail -n 1 | cut -d= -f2-; }
-new_ref="$(value new_ref)"
+value() { grep -E "^$1=" "$check_out" | tail -n 1 | cut -d= -f2- || true; }
 verification="$(value verification)"
 if [[ "$verification" = unchanged ]]; then
     record unchanged "$(value current)" "$(value current)" ""
     echo "unchanged: ${component} $(value current)"
     exit 0
 fi
+if [[ "$verification" = held ]]; then
+    record held "$(value current)" "" "pin held (${component^^}_HOLD=1)"
+    echo "held: ${component} $(value current)"
+    exit 0
+fi
+new_ref="$(value new_ref)"
 [[ "$verification" = clean && -n "$new_ref" ]] || { echo "unexpected check output" >&2; cat "$check_out" >&2; exit 1; }
 
 resolve_commit() { # repo tag -> 40-hex sha

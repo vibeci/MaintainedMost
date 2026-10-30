@@ -54,7 +54,7 @@ does not guarantee future server compatibility. The current bundle is
 1000.12.6 from Calls source 1.12.6, with fork-only fixes advancing the bundle.
 
 **The repo holds ordered patches against immutable pins.** A conflict fails the
-build; patches are never silently dropped. Server 12.0.0 is pinned to a commit
+build; patches are never silently dropped. Server 12.0.1 is pinned to a commit
 and matching image digest, Calls follows the newest stable release compatible
 with that server, and the transcriber is pinned at c09a9a3. Updating them requires
 compatibility, commit and runtime-image review, plus testing.
@@ -62,7 +62,7 @@ compatibility, commit and runtime-image review, plus testing.
 ## Requirements
 
 - A compatible self-hosted server: the Calls manifest minimum is v12.0 and the
-  current integration target is v12.0.0. The server image and repository Compose
+  current integration target is v12.0.1. The server image and repository Compose
   stack target Linux/amd64.
 - System administrator access to the server.
 - Deployment access for configuration, job services and recovery.

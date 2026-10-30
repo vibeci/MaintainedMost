@@ -42,11 +42,31 @@ test('patch conflicts require rebasing without dropping patches', async () => {
 });
 
 test('network failures and incomplete checks cannot create rebase alerts', async () => {
-    for (const status of ['', 'error', 'unchanged']) {
+    for (const status of ['', 'error']) {
         const input = fixture([], {VERIFICATION: status});
         await assert.rejects(alert(input), /without a completed patch check/);
         assert.equal(input.calls.length, 0);
     }
+});
+
+test('shipped advisories are closed as stale', async () => {
+    const begin = '<!-- maintainedmost-upstream:CALLS_TAG -->';
+    const input = fixture([
+        {number: 7, title: 'calls v1.12.5 is available', body: `discussion ${begin} stale ${'<!-- /maintainedmost-upstream -->'}`, user: {login: 'github-actions[bot]'}},
+    ], {VERIFICATION: 'unchanged', NEW_REF: undefined});
+    await alert(input);
+    assert.match(input.calls.find((call) => call.name === 'createComment').body, /upgrade shipped/);
+    assert.equal(input.calls.find((call) => call.name === 'update').state, 'closed');
+});
+
+test('held pins close the alert and explain the hold', async () => {
+    const begin = '<!-- maintainedmost-upstream:TRANSCRIBER_TAG -->';
+    const input = fixture([
+        {number: 9, title: 'transcriber master advanced', body: `note ${begin} x ${'<!-- /maintainedmost-upstream -->'}`, user: {login: 'github-actions[bot]'}},
+    ], {REPO: 'mattermost/calls-transcriber', KEY: 'TRANSCRIBER_TAG', VERIFICATION: 'held', NEW_REF: undefined, BRANCH: 'master'});
+    await alert(input);
+    assert.match(input.calls.find((call) => call.name === 'createComment').body, /TRANSCRIBER_HOLD=1/);
+    assert.equal(input.calls.find((call) => call.name === 'update').state, 'closed');
 });
 
 test('paginated alerts are updated, deduplicated, and maintainer notes survive', async () => {

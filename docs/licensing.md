@@ -12,7 +12,7 @@ present in the [pinned FAQ](https://github.com/mattermost/mattermost/blob/3acb3a
 
 The actual source licence files say otherwise:
 
-- [Mattermost server 12.0.0](https://github.com/mattermost/mattermost/blob/1f5e0e9ba40da7ba0741659346e0a385a623d6a4/LICENSE.txt#L9-L15)
+- [Mattermost server 12.0.1](https://github.com/mattermost/mattermost/blob/987e57120dca630dadbcd2638064ab66a02bb81e/LICENSE.txt#L9-L15)
   grants use under the Free Software Foundation's **GNU AGPL v3.0**, subject to
   its listed exceptions, or under a commercial licence.
 - [Calls 1.12.6](https://github.com/mattermost/mattermost-plugin-calls/blob/b8a43a461f6a15ebd5229d08098a34b71f659b3c/LICENSE.txt#L9-L14)

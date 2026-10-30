@@ -13,7 +13,7 @@ not work on Mattermost Cloud, which allows neither plugin uploads nor custom
 environment variables.
 
 - A compatible self-hosted server. The plugin manifest requires v12.0 or later;
-  the current integration target is the pinned server v12.0.0, not every later
+  the current integration target is the pinned server v12.0.1, not every later
   release.
 - System administrator access to the System Console
 - Shell or orchestration access for configuration and recovery

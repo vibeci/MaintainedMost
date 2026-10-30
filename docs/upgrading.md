@@ -74,7 +74,7 @@ protect against an explicit administrator replacement.
 
 ## Upgrading the server image
 
-Current source pins are server 12.0.0 with a matching commit/image digest,
+Current source pins are server 12.0.1 with a matching commit/image digest,
 Calls 1.12.6 and transcriber c09a9a3. Calls follows the newest stable release
 compatible with the pinned server. Maintainers must review tags, commits and
 the runtime image together; a patch conflict fails the build, never silently
