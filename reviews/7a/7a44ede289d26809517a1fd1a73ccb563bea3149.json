@@ -1,0 +1,10 @@
+{
+  "commit": "7a44ede289d26809517a1fd1a73ccb563bea3149",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Bump Calls dependency to v1.12.6 and update associated patch hunks and documentation.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-17T10:52:15.778018117Z"
+}

@@ -1,0 +1,17 @@
+{
+  "commit": "ebab4ed3aa0c1e657c14638735f4129f561696c0",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Add CI check and CLAUDE.md guidelines prohibiting Claude co-author trailers.",
+  "signals": [
+    {
+      "kind": "ci_config",
+      "file": ".github/workflows/build.yml",
+      "detail": "CI/CD configuration changed (runs with repository secrets)"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-13T14:20:02.667198461Z"
+}

@@ -1,0 +1,36 @@
+{
+  "repo": "maintainedmost",
+  "last_upstream_tip": "182f8493028800d1d525f0d6ac11e2b7533ca7a7",
+  "last_fork_head": "3837a25eedb48f0fc2c81492dc17186546743a78",
+  "last_result": "error",
+  "last_message": "review: triage: llm call: llm api error (HTTP 402): insufficient_balance: balance too low for this request — deposit USDC to continue",
+  "last_job": "maintainedmost-20261107-060729-7bd2d5",
+  "last_attempt": "2026-11-07T06:07:28.765288082Z",
+  "failure": {
+    "kind": "error",
+    "fork_head": "3837a25eedb48f0fc2c81492dc17186546743a78",
+    "target": "182f8493028800d1d525f0d6ac11e2b7533ca7a7",
+    "count": 1,
+    "streak": 20,
+    "first_at": "2026-11-07T06:07:30.355390612Z",
+    "last_at": "2026-11-07T06:07:30.355390612Z",
+    "next_retry": "2026-11-07T06:36:28.765288082Z",
+    "error": "review: triage: llm call: llm api error (HTTP 402): insufficient_balance: balance too low for this request — deposit USDC to continue",
+    "alerted": false
+  },
+  "proposal": {
+    "base": "953e0f14a0553224d17f07f18db9bd934a4c3511",
+    "upstream": "dc748b9ead1efd4ddc549e1fc3c59ce06ad675cf",
+    "target": "dc748b9ead1efd4ddc549e1fc3c59ce06ad675cf",
+    "commit": "a95362fa5ab3b38a3db0f5021d0534b57ad596da",
+    "job_id": "maintainedmost-20261024-044453-ddbb6c",
+    "time": "2026-10-24T04:56:09.900562312Z"
+  },
+  "usage": {
+    "input_tokens": 87447593,
+    "output_tokens": 229215,
+    "cache_read_tokens": 58268133,
+    "cache_write_tokens": 0,
+    "calls": 1146
+  }
+}

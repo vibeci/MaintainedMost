@@ -1,0 +1,17 @@
+{
+  "commit": "0ee12721b69d29659ddb2c01646cd2a74d444951",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Updates the Containerfile and troubleshooting docs to prevent conflicting prepackaged calls plugin bundles.",
+  "signals": [
+    {
+      "kind": "build_config",
+      "file": "Containerfile",
+      "detail": "build, packaging or install configuration changed"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383835395Z"
+}

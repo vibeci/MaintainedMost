@@ -1,0 +1,10 @@
+{
+  "commit": "dc748b9ead1efd4ddc549e1fc3c59ce06ad675cf",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Bumps upstream Mattermost server tag to v12.0.1.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-23T17:15:10.945446083Z"
+}

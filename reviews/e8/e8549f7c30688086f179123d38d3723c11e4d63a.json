@@ -1,0 +1,10 @@
+{
+  "commit": "e8549f7c30688086f179123d38d3723c11e4d63a",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Adds local integration testing and seeding scripts for release verification.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-15T17:07:30.633505497Z"
+}

@@ -1,0 +1,10 @@
+{
+  "commit": "ea6dbf31b0fb09fd745ccb33e1859603bebb46f4",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Update documentation to guide self-hosting with the Mattermore server image.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.934938574Z"
+}

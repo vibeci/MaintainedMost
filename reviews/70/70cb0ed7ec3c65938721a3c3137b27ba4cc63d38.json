@@ -1,0 +1,27 @@
+{
+  "commit": "70cb0ed7ec3c65938721a3c3137b27ba4cc63d38",
+  "verdict": "clean",
+  "confidence": 1,
+  "summary": "Disable playbooks plugin and add an uptime check workflow for public endpoints.",
+  "signals": [
+    {
+      "kind": "ci_config",
+      "file": ".github/workflows/uptime.yml",
+      "detail": "CI/CD configuration changed (runs with repository secrets)"
+    },
+    {
+      "kind": "new_urls",
+      "file": ".github/workflows/uptime.yml",
+      "detail": "hosts referenced in added code: api.mattermore.dev, example.invalid, ghcr.io, mattermore.dev"
+    },
+    {
+      "kind": "build_config",
+      "file": "Containerfile",
+      "detail": "build, packaging or install configuration changed"
+    }
+  ],
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:40:06.93493643Z"
+}

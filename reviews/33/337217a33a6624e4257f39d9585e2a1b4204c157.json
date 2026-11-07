@@ -1,0 +1,10 @@
+{
+  "commit": "337217a33a6624e4257f39d9585e2a1b4204c157",
+  "verdict": "clean",
+  "confidence": 0.99,
+  "summary": "Adds a patch to hide the built-in Channels category in the sidebar when it is empty.",
+  "stage": "triage",
+  "model": "inferhub-flash-high",
+  "version": "review-v1",
+  "time": "2026-10-10T12:39:54.383834433Z"
+}
